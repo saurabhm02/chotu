@@ -1,34 +1,34 @@
-# ty — Floating AI Assistant & Knowledge Overlay
+# ty — A Floating AI Overlay for macOS with Notes System
 
-A lightweight, spotlight-style floating AI assistant for your desktop. Always one keystroke away, designed to answer questions, run quick commands, and help you take notes without switching away from your current workflow.
+A lightweight, spotlight-style ambient AI overlay for macOS with a built-in notes and personal knowledge base system. Always one keystroke away (`Cmd + /`), designed to answer questions, run fast slash commands, and capture notes without breaking your focus or switching away from your active apps.
 
-Built with **100% Rust** — using **Tauri v2** for the native desktop runtime and **Yew (WebAssembly)** for the frontend interface.
+Built with **100% Rust** — powered by **Tauri v2** for the native macOS desktop runtime and **Yew (WebAssembly)** for the reactive frontend interface.
 
 ---
 
 ## 🎯 Project Goal
 
-Modern work involves constant context switching between browsers, terminals, notes, and chat apps. The goal of `ty` is to build a fast, keyboard-first personal assistant that floats directly over your screen:
-- **Instant Access**: Summon with a global shortcut from anywhere, ask a question, and get back to work.
-- **Minimal & Distraction-Free**: A compact bar that expands smoothly only when needed.
-- **Personal Knowledge Hub**: Ask questions, extract text, and save structured notes into a local knowledge base.
+Modern work involves constant context switching between browsers, code editors, terminals, note apps, and chat tools. `ty` eliminates that friction:
+- **Always One Keystroke Away**: Summon the floating overlay with `Cmd + /` from anywhere (even over fullscreen apps), ask questions, and dismiss instantly.
+- **Minimal & Distraction-Free**: A clean spotlight ask bar that expands dynamically only when answers or multi-line prompts are present.
+- **Built-in Notes & Second Brain**: Save structured insights directly into local notes and query your knowledge base later with *"What did I learn about X?"*.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Desktop Framework**: [Tauri v2](https://v2.tauri.app/) (Rust backend)
+- **Desktop Runtime**: [Tauri v2](https://v2.tauri.app/) (Rust native backend)
 - **Frontend**: [Yew 0.21](https://yew.rs/) (Rust WebAssembly)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)
 - **Build Tools**: [Trunk](https://trunkrs.dev/) (WASM bundler)
-- **AI Engine**: OpenAI-compatible LLM integration via `async-openai`
-- **Markdown**: `pulldown-cmark` for rendering structured AI answers
+- **AI Engine**: OpenAI-compatible LLM client via `async-openai`
+- **Markdown**: `pulldown-cmark` for structured answer and code rendering
 
 ---
 
 ## 🗺️ Roadmap & Current Status
 
-We are building this project in phases:
+We are building this project in iterative phases:
 
 ### ✅ Phase 1: Core Foundation & Scaffolding
 - [x] Initialized Tauri v2 + Yew WebAssembly project.
@@ -64,8 +64,8 @@ We are building this project in phases:
 - [ ] SQLite database integration for saving conversation history.
 - [ ] Session restore and persistent conversation memory.
 
-### ⏳ Phase 8: Personal Knowledge Base & Notes
-- [ ] "Save as Note" action from any AI answer.
+### ⏳ Phase 8: Personal Knowledge Base & Notes System
+- [ ] "Save as Note" action directly from any AI response.
 - [ ] Note tagging, full-text search (SQLite FTS5), and retrieval-augmented context ("what did I learn about X?").
 
 ---
@@ -148,7 +148,7 @@ ty/
 
 | Shortcut / Action | Description |
 |---|---|
-| `Cmd + /` (macOS) / `Ctrl + /` | Toggle floating bar visibility |
+| `Cmd + /` (macOS) / `Ctrl + /` | Toggle floating overlay visibility |
 | `Enter` | Submit prompt to AI |
 | `Shift + Enter` | Insert newline in input |
 | Drag outside input/buttons | Move the floating window anywhere on screen |
