@@ -2,6 +2,7 @@
 /dist/
 /target/
 src-tauri/target/
+src-tauri/gen/
 
 # Dependencies
 node_modules/
@@ -10,6 +11,13 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Documentation & internal analysis
+docs/
+
+# IDE & Editor files
+.vscode/
+.idea/
 
 # OS files
 .DS_Store
