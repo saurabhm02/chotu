@@ -1,8 +1,10 @@
 use tauri::Manager;
 
+pub mod adapters;
 pub mod ai;
 pub mod commands;
 pub mod types;
+pub mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -57,7 +59,10 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![commands::ai::ask_ai])
+        .invoke_handler(tauri::generate_handler![
+            commands::ai::ask_ai,
+            commands::websearch::ask_web
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

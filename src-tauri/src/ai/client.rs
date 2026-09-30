@@ -8,7 +8,7 @@ use async_openai::{
 };
 use std::env;
 
-use crate::types::constants;
+use crate::types::constants::{self, DEFAULT_SYSTEM_PROMPT};
 
 pub struct AiClient {
     pub url: String,
@@ -83,5 +83,54 @@ impl AiClient {
             .ok_or_else(|| "empty text content response".to_string())?;
 
         Ok(content)
+    }
+    pub async fn call_llm_for_web(&self, query: &str, blocks: &str) -> Result<String, String> {
+        let nonce = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
+        let open = format!("<<<UNTRUSTED_WEB_CONTENT {nonce}>>>");
+        let close = format!("<<<END_UNTRUSTED_WEB_CONTENT {nonce}>>>");
+
+        let today = chrono::Utc::now().format("%A, %y-%m-%d").to_string();
+
+        let prompt = include_str!("../../prompts/websearch_prompt.txt")
+            .replace("{TODAY}", &today)
+            .replace("{OPEN_FENCE}", &open)
+            .replace("{CLOSE_FENCE}", &close)
+            .replace("{SOURCES}", blocks);
+
+        let sys_prompt = format!("{}\n{}", DEFAULT_SYSTEM_PROMPT, prompt);
+        let messages = vec![
+            ChatCompletionRequestSystemMessageArgs::default()
+                .content(sys_prompt)
+                .build()
+                .map_err(|e| e.to_string())?
+                .into(),
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(query)
+                .build()
+                .map_err(|e| e.to_string())?
+                .into(),
+        ];
+
+        let req = CreateChatCompletionRequestArgs::default()
+            .model(&self.model)
+            .messages(messages)
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        let response = self
+            .client
+            .chat()
+            .create(req)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        response
+            .choices
+            .first()
+            .ok_or_else(|| "no choices".to_string())?
+            .message
+            .content
+            .clone()
+            .ok_or_else(|| "empty text response from llm!".to_string())
     }
 }
