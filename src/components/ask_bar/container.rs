@@ -17,7 +17,12 @@ pub fn ask_bar() -> Html {
         if e.button() == 0 {
             if let Some(target) = e.target_dyn_into::<web_sys::HtmlElement>() {
                 let tag = target.tag_name().to_lowercase();
-                if tag != "textarea" && tag != "input" && tag != "button" && tag != "svg" && tag != "path" {
+                if tag != "textarea"
+                    && tag != "input"
+                    && tag != "button"
+                    && tag != "svg"
+                    && tag != "path"
+                {
                     start_window_drag();
                 }
             }
@@ -75,6 +80,9 @@ pub fn ask_bar() -> Html {
     };
 
     let on_cmd_select = {
+        let input_ref = input_ref.clone();
+        let input_text = input_text.clone();
+
         Callback::from(move |cmd: Commands| match cmd {
             Commands::Web => log::info!("Running - Web!"),
             Commands::Notes => log::info!("adding notes!"),
@@ -116,6 +124,7 @@ pub fn ask_bar() -> Html {
                         updated.push(ChatTurn {
                             prompt: value,
                             response,
+                            sources: vec![],
                         });
                         history.set(updated);
                         is_loading.set(false);

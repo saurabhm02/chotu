@@ -22,6 +22,7 @@ Modern work involves constant context switching between browsers, code editors, 
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) + [DaisyUI v5](https://daisyui.com/)
 - **Build Tools**: [Trunk](https://trunkrs.dev/) (WASM bundler)
 - **AI Engine**: OpenAI-compatible LLM client via `async-openai`
+- **Web Search & Extraction**: DuckDuckGo SERP scraping via `scraper`, article extraction via `readability`, and async concurrency via `futures` / `tokio`
 - **Markdown**: `pulldown-cmark` for structured answer and code rendering
 
 ---
@@ -46,7 +47,7 @@ We are building this project in iterative phases:
 - [x] Tauri IPC command bridge (`ask_ai`).
 - [x] OpenAI-compatible client integration supporting custom endpoints, API keys, and models.
 
-### ✅ Phase 5: Reactive UI & Modular Architecture *(Current Phase)*
+### ✅ Phase 5: Reactive UI & Modular Architecture
 - [x] Cyberpunk-inspired **Aura Dual** glowing input borders with responsive corner brackets.
 - [x] Multi-line auto-expanding textarea (up to 180px) with auto-scrolling.
 - [x] **LatticeLoader**: 3x3 orbit wave dot matrix loading indicator with live stopwatch timer.
@@ -55,16 +56,22 @@ We are building this project in iterative phases:
 - [x] Markdown response rendering with custom code block and text styling.
 - [x] Modular architecture separating Presentation (View), State (Container), Services (Tauri Bridge), Types, and Backend Commands.
 
-### ⏳ Phase 6: Screen & Context Capture *(Next Up)*
+### ✅ Phase 6: Live Web Search & Grounding Engine *(New)*
+- [x] DuckDuckGo SERP scraping with ad-filtering and robust percent-decoding.
+- [x] Concurrent top-k page fetching with `readability` article text extraction and timeouts.
+- [x] Untrusted web content isolation with dynamic nonce-fenced delimiters against prompt injection.
+- [x] Grounded citation generation (`[1]`, `[2]`) and source attribution via `ask_web` IPC command.
+
+### ⏳ Phase 7: Screen & Context Capture *(Next Up)*
 - [ ] Active text selection detection via system Accessibility APIs.
 - [ ] Screenshot capture command (`/screen`) to send visual context to multimodal models.
 - [ ] OCR text extraction from screenshots.
 
-### ⏳ Phase 7: Local Storage & Sessions
+### ⏳ Phase 8: Local Storage & Sessions
 - [ ] SQLite database integration for saving conversation history.
 - [ ] Session restore and persistent conversation memory.
 
-### ⏳ Phase 8: Personal Knowledge Base & Notes System
+### ⏳ Phase 9: Personal Knowledge Base & Notes System
 - [ ] "Save as Note" action directly from any AI response.
 - [ ] Note tagging, full-text search (SQLite FTS5), and retrieval-augmented context ("what did I learn about X?").
 
@@ -85,15 +92,20 @@ ty/
 │   │   └── loaders/                      # LatticeLoader
 │   ├── services/
 │   │   └── tauri_bridge.rs               # Encapsulated Tauri v2 WASM FFI & helpers
-│   ├── types/                            # Domain types (ChatTurn, Commands, etc.)
-│   └── utils/                            # Shared utilities
+│   └── types/                            # Domain types (ChatTurn, Commands, etc.)
 └── src-tauri/                            # Backend (Tauri v2 Native Rust)
+    ├── prompts/                          # System & grounding prompts
+    │   ├── system_prompt.txt             # Core ty assistant persona
+    │   └── websearch_prompt.txt          # Web grounding & citation prompt
     ├── src/
     │   ├── main.rs                       # Tauri binary entry
-    │   ├── lib.rs                        # App setup, shortcuts, plugin registry
-    │   ├── commands/                     # Tauri command handlers (ask_ai)
-    │   ├── ai/                           # AI client implementation
-    │   └── types/                        # Backend types & constants
+    │   ├── lib.rs                        # App setup, shortcuts, command registry
+    │   ├── adapters/                     # External data adapters (DDG scraping, fetch)
+    │   │   └── websearch.rs              # DuckDuckGo search and article extraction
+    │   ├── ai/                           # AI client implementation & web grounding
+    │   ├── commands/                     # Tauri command handlers (ask_ai, ask_web)
+    │   ├── types/                        # Backend constants & types
+    │   └── utils/                        # Scrapers, builders, static HTTP client
     ├── capabilities/                     # Window permissions & capabilities
     └── tauri.conf.json                   # App configuration
 ```

@@ -1,5 +1,5 @@
+use crate::types::chat::{AskBarInput, AskWebInput, WebSearchResponse};
 use wasm_bindgen::prelude::*;
-use crate::types::chat::AskBarInput;
 
 #[wasm_bindgen]
 extern "C" {
@@ -36,9 +36,17 @@ pub fn start_window_drag() {
     let _ = get_current_window().start_dragging();
 }
 
-pub async fn invoke_ask_ai(prompt: String) -> Result<String, String> {
-    let req = AskBarInput { prompt };
+pub async fn invoke_ask_ai(query: String) -> Result<String, String> {
+    let req = AskBarInput { query };
     let args = serde_wasm_bindgen::to_value(&req).map_err(|e| e.to_string())?;
     let res = invoke("ask_ai", args).await;
-    res.as_string().ok_or_else(|| "Failed to parse response string".to_string())
+    res.as_string()
+        .ok_or_else(|| "Failed to parse response string".to_string())
+}
+
+pub async fn ask_web(query: String) -> Result<WebSearchResponse, String> {
+    let req = AskWebInput { query };
+    let args = serde_wasm_bindgen::to_value(&req).map_err(|e| e.to_string())?;
+    let res = invoke("ask_web", args).await;
+    serde_wasm_bindgen::from_value(res).map_err(|e| e.to_string())
 }

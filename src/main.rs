@@ -2,7 +2,6 @@ mod app;
 mod components;
 mod services;
 mod types;
-mod utils;
 
 use app::App;
 
