@@ -1,2 +1,10 @@
-pub const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful, precise, and concise AI assistant. \
-     Answer questions clearly, avoiding conversational filler.";
+pub const DEFAULT_SYSTEM_PROMPT: &str = include_str!("../../prompts/system_prompt.txt");
+
+pub const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
+     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+pub const DDG_URL: &str = "https://html.duckduckgo.com/html/";
+
+pub const TIMEOUT_S: u64 = 5;
+pub const PAGE_CONTENT_CHAR: usize = 1500;
+pub const TOP_PAGE_K: usize = 5;
