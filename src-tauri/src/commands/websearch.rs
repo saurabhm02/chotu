@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tauri::ipc::Channel;
 
 use crate::adapters::websearch::web_search;
 use crate::ai::client::AiClient;
@@ -10,10 +11,12 @@ pub struct WebSearchResponse {
 }
 
 #[tauri::command]
-pub async fn ask_web(query: String) -> Result<WebSearchResponse, String> {
+pub async fn ask_web(channel: Channel<String>, query: String) -> Result<WebSearchResponse, String> {
     let (items, blocks) = web_search(&query, "en").await?;
 
-    let ai_ans = AiClient::new().call_llm_for_web(&query, &blocks).await?;
+    let ai_ans = AiClient::shared()
+        .call_llm_for_web(&channel, &query, &blocks)
+        .await?;
     let sources = items.into_iter().map(|i| (i.title, i.source)).collect();
 
     Ok(WebSearchResponse {
@@ -31,10 +34,17 @@ mod tests {
     async fn test_ask_web() {
         dotenvy::dotenv().ok();
 
-        let response =
-            ask_web("is web3 is growing in 2026 after aug 2026 and what is growing?".to_string())
-                .await
-                .expect("ask_web should succeed");
+        let channel: Channel<String> = Channel::new(|_msg| Ok(()));
+        let query = "is web3 is growing in 2026 after aug 2026 and what is growing?";
+        let (items, blocks) = web_search(query, "en")
+            .await
+            .expect("web_search should succeed");
+        let ans = AiClient::shared()
+            .call_llm_for_web(&channel, query, &blocks)
+            .await
+            .expect("call_llm_for_web should succeed");
+        let sources = items.into_iter().map(|i| (i.title, i.source)).collect();
+        let response = WebSearchResponse { ans, sources };
 
         assert!(!response.ans.is_empty());
         println!("{:#?}", response);

@@ -29,3 +29,19 @@ gloo-timers = "0.3"
 
 [workspace]
 members = ["src-tauri"]
+
+# Smaller debug builds: keep line tables for backtraces, drop dependency debuginfo.
+[profile.dev]
+debug = "line-tables-only"
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

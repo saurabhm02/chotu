@@ -2,11 +2,14 @@ use async_openai::{
     config::OpenAIConfig,
     types::chat::{
         ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequestArgs,
+        CreateChatCompletionRequest, CreateChatCompletionRequestArgs,
     },
     Client,
 };
+use futures::StreamExt;
 use std::env;
+use std::sync::OnceLock;
+use tauri::ipc::Channel;
 
 use crate::types::constants::{self, DEFAULT_SYSTEM_PROMPT};
 
@@ -17,8 +20,15 @@ pub struct AiClient {
     pub client: Client<OpenAIConfig>,
 }
 
+static SHARED: OnceLock<AiClient> = OnceLock::new();
+
 impl AiClient {
-    pub fn new() -> Self {
+    /// Process-wide client, built once on first use and reused for every request.
+    pub fn shared() -> &'static AiClient {
+        SHARED.get_or_init(AiClient::new)
+    }
+
+    fn new() -> Self {
         let url = env::var("API_URL").expect("API_URL must be set");
         let key = env::var("API_KEY").expect("API_KEY must be set");
         let model = env::var("AI_MODEL").expect("AI_MODEL must be set");
@@ -29,7 +39,6 @@ impl AiClient {
         let client = Client::with_config(config);
 
         log::info!("AiClient created (url: {}, model: {})", url, model);
-
         Self {
             url,
             key,
@@ -38,7 +47,48 @@ impl AiClient {
         }
     }
 
-    pub async fn call_llm(&self, prompt: &str) -> Result<String, String> {
+    async fn stream_to_channel(
+        &self,
+        channel: &Channel<String>,
+        req: CreateChatCompletionRequest,
+        empty_err: &str,
+    ) -> Result<String, String> {
+        let mut stream = self.client.chat().create_stream(req).await.map_err(|e| {
+            log::error!("LLM stream request failed: {e}");
+            e.to_string()
+        })?;
+
+        let mut full_text = String::new();
+        let mut chunks = 0usize;
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| {
+                log::error!("LLM stream chunk error after {chunks} chunks: {e}");
+                e.to_string()
+            })?;
+            if let Some(delta) = chunk.choices.first().and_then(|c| c.delta.content.as_ref()) {
+                chunks += 1;
+                log::info!("chunk {chunks} at {:?}", std::time::Instant::now());
+                full_text.push_str(delta);
+                let _ = channel.send(delta.clone());
+            }
+        }
+
+        if full_text.is_empty() {
+            log::warn!("LLM returned no content ({chunks} chunks)");
+            return Err(empty_err.to_string());
+        }
+
+        let preview: String = full_text.chars().take(200).collect();
+        log::info!(
+            "LLM response received: {} chars in {chunks} chunks, preview: {preview:?}",
+            full_text.len()
+        );
+
+        Ok(full_text)
+    }
+
+    pub async fn call_llm(&self, channel: &Channel<String>, query: &str) -> Result<String, String> {
         let messages = vec![
             ChatCompletionRequestSystemMessageArgs::default()
                 .content(constants::DEFAULT_SYSTEM_PROMPT)
@@ -46,7 +96,7 @@ impl AiClient {
                 .map_err(|e| e.to_string())?
                 .into(),
             ChatCompletionRequestUserMessageArgs::default()
-                .content(prompt)
+                .content(query)
                 .build()
                 .map_err(|e| e.to_string())?
                 .into(),
@@ -55,36 +105,27 @@ impl AiClient {
         let req = CreateChatCompletionRequestArgs::default()
             .model(&self.model)
             .messages(messages)
+            .stream(true)
             .build()
             .map_err(|e| e.to_string())?;
 
         log::info!(
-            "sending chat completion request to {} (model: {})",
+            "sending streaming chat completion request to {} (model: {}), input: {:?}",
             self.url,
-            self.model
+            self.model,
+            query
         );
 
-        let response = self
-            .client
-            .chat()
-            .create(req)
+        self.stream_to_channel(channel, req, "empty text content response")
             .await
-            .map_err(|e| e.to_string())?;
-
-        log::info!("received chat completion response");
-
-        let content = response
-            .choices
-            .first()
-            .ok_or_else(|| "no choices".to_string())?
-            .message
-            .content
-            .clone()
-            .ok_or_else(|| "empty text content response".to_string())?;
-
-        Ok(content)
     }
-    pub async fn call_llm_for_web(&self, query: &str, blocks: &str) -> Result<String, String> {
+
+    pub async fn call_llm_for_web(
+        &self,
+        channel: &Channel<String>,
+        query: &str,
+        blocks: &str,
+    ) -> Result<String, String> {
         let nonce = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
         let open = format!("<<<UNTRUSTED_WEB_CONTENT {nonce}>>>");
         let close = format!("<<<END_UNTRUSTED_WEB_CONTENT {nonce}>>>");
@@ -114,23 +155,18 @@ impl AiClient {
         let req = CreateChatCompletionRequestArgs::default()
             .model(&self.model)
             .messages(messages)
+            .stream(true)
             .build()
             .map_err(|e| e.to_string())?;
 
-        let response = self
-            .client
-            .chat()
-            .create(req)
-            .await
-            .map_err(|e| e.to_string())?;
+        log::info!(
+            "sending web chat completion request (model: {}), input: {:?}, sources: {} chars",
+            self.model,
+            query,
+            blocks.len()
+        );
 
-        response
-            .choices
-            .first()
-            .ok_or_else(|| "no choices".to_string())?
-            .message
-            .content
-            .clone()
-            .ok_or_else(|| "empty text response from llm!".to_string())
+        self.stream_to_channel(channel, req, "empty text response from llm!")
+            .await
     }
 }
