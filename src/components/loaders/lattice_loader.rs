@@ -55,7 +55,7 @@ pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
     let timer_str = format!("{:.1}s", seconds);
 
     html! {
-        <div class="inline-flex items-center gap-2 text-white select-none px-2.5 py-1 bg-[#22252c] rounded-md border border-white/10">
+        <div class="inline-flex items-center gap-2 text-white select-none px-3 py-1.5 bg-[#181a20]/90 backdrop-blur-md rounded-xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
             <div
                 class="grid grid-cols-3 shrink-0"
                 style={format!(

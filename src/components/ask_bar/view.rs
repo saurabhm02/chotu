@@ -1,23 +1,12 @@
-use pulldown_cmark::{html, Options, Parser};
 use yew::prelude::*;
 
+use crate::components::chat::{AssistantCard, UserBubble};
+use crate::components::command_palette::CommandPalette;
 use crate::components::common::{
     ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon, InputCornerMarks, OuterCornerMarks,
 };
 use crate::components::loaders::LatticeLoader;
 use crate::types::{ChatTurn, Command, Commands};
-
-fn render_markdown(input: &str) -> Html {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    options.insert(Options::ENABLE_TABLES);
-
-    let parser = Parser::new_ext(input, options);
-    let mut html_output = String::new();
-    html::push_html(&mut html_output, parser);
-
-    Html::from_html_unchecked(AttrValue::from(html_output))
-}
 
 #[derive(Properties, PartialEq)]
 pub struct AskBarViewProps {
@@ -29,7 +18,10 @@ pub struct AskBarViewProps {
     pub is_loading: bool,
     pub on_input: Callback<InputEvent>,
     pub commands: Vec<Command>,
+    pub selected_cmd_index: usize,
     pub on_cmd_select: Callback<Commands>,
+    pub on_cmd_hover: Callback<usize>,
+    pub on_regenerate: Callback<usize>,
 }
 
 #[function_component(AskBarView)]
@@ -42,8 +34,8 @@ pub fn ask_bar_view(props: &AskBarViewProps) -> Html {
         onmousedown={props.on_mousedown.clone()}
         id="app-container"
         class={classes!(
-          "relative", "bg-black", "text-white", "w-full", "flex", "flex-col", "justify-end", "box-border",
-          if is_expanded { "p-3.5 gap-3 min-h-[120px]" } else { "p-2.5 gap-2" }
+          "relative", "bg-black", "text-white", "w-full", "flex", "flex-col", "justify-end", "box-border", "select-none",
+          if is_expanded { "p-3 gap-2.5" } else { "p-2 gap-1.5" }
         )}
       >
         if is_expanded {
@@ -51,64 +43,57 @@ pub fn ask_bar_view(props: &AskBarViewProps) -> Html {
         }
 
         if is_expanded {
-            <div class="relative w-full flex-1 max-h-[400px] overflow-y-auto px-1 py-1">
-                <div class="flex flex-col gap-2">
-                    { for props.history.iter().map(|turn| html! {
-                        <>
-                            <div class="flex justify-end">
-                                <div class="bg-[#323946] text-gray-100 rounded-lg px-3 py-1.5 max-w-[80%] text-sm">
-                                    {turn.prompt.clone()}
-                                </div>
-                            </div>
-                            <div class="flex justify-start">
-                                <div class="markdown-content bg-[#424854] text-white rounded-lg px-3 py-1.5 max-w-[80%] text-sm">
-                                    { render_markdown(&turn.response) }
-                                </div>
-                            </div>
-                        </>
-                    }) }
-                    if props.is_loading {
-                        <div class="flex justify-start py-1">
-                            <LatticeLoader label="Thinking" show_timer=true />
+            <div class="relative w-full flex-1 max-h-[420px] overflow-y-auto px-0.5 py-0.5 space-y-2.5 cmd-scroll">
+                { for props.history.iter().enumerate().map(|(idx, turn)| {
+                    let on_regen = {
+                        let on_regenerate = props.on_regenerate.clone();
+                        Callback::from(move |_| {
+                            on_regenerate.emit(idx);
+                        })
+                    };
+                    html! {
+                        <div key={idx} class="flex flex-col gap-2 w-full">
+                            <UserBubble
+                                prompt={turn.prompt.clone()}
+                                timestamp={turn.timestamp.clone()}
+                            />
+                            if !turn.response.is_empty() {
+                                <AssistantCard
+                                    response={turn.response.clone()}
+                                    sources={turn.sources.clone()}
+                                    on_regenerate={Some(on_regen)}
+                                />
+                            }
                         </div>
                     }
-                </div>
+                }) }
+
+                if props.is_loading {
+                    <div class="flex justify-start py-0.5">
+                        <LatticeLoader label="Thinking" show_timer=true />
+                    </div>
+                }
             </div>
         }
 
         if !props.commands.is_empty() {
-            <div class="w-full">
-                <div class="cmd-scroll max-h-28 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.03] py-1">
-                    { for props.commands.iter().map(|c| {
-                        let cmd = c.cmd.clone();
-                        let on_select = props.on_cmd_select.clone();
-                        let onclick = Callback::from(move |_: MouseEvent| {
-                            on_select.emit(cmd.clone());
-                        });
-                        html! {
-                            <div
-                                onclick={onclick}
-                                class="flex items-baseline gap-2 px-3 py-1.5 cursor-pointer hover:bg-white/[0.06] transition-colors"
-                            >
-                                <span class="shrink-0 text-sm text-gray-100">{format!("/{}", c.name)}</span>
-                                <span class="-translate-y-[3px] flex-1 border-b border-dotted border-gray-700"></span>
-                                <span class="shrink-0 text-xs text-gray-500">{c.description}</span>
-                            </div>
-                        }
-                    }) }
-                </div>
-            </div>
+            <CommandPalette
+                commands={props.commands.clone()}
+                selected_index={props.selected_cmd_index}
+                on_select={props.on_cmd_select.clone()}
+                on_hover={props.on_cmd_hover.clone()}
+            />
         }
 
         <div class="aura aura-dual w-full text-white/40 rounded-lg p-[1px] block">
             <div class="relative w-full bg-black rounded-lg">
                 <InputCornerMarks />
                 <div class="px-2.5 py-1.5 flex items-center gap-2 justify-between">
-                    <div class="flex items-center justify-center w-6 shrink-0 text-gray-300">
+                    <div class="flex items-center justify-center w-5 shrink-0 text-neutral-400 hover:text-white transition-colors cursor-pointer">
                         <DoubleChevronUpIcon />
                     </div>
 
-                    <div class="w-0.5 h-4 bg-gray-400 shrink-0 self-center"></div>
+                    <div class="w-[1px] h-3.5 bg-white/20 shrink-0 self-center"></div>
 
                     <div class="relative flex items-center flex-1 min-w-0">
                       <textarea
@@ -117,8 +102,8 @@ pub fn ask_bar_view(props: &AskBarViewProps) -> Html {
                         oninput={props.on_input.clone()}
                         id="input"
                         rows="1"
-                        placeholder="Ask anything"
-                        class="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-100 placeholder-gray-500 px-1 py-0.5 leading-relaxed overflow-y-auto"
+                        placeholder="Ask anything..."
+                        class="w-full bg-transparent border-none outline-none resize-none text-[13.5px] text-neutral-100 placeholder-neutral-500 px-1 py-0.5 leading-relaxed overflow-y-auto"
                         style="min-height: 24px; max-height: 180px;"
                       />
                     </div>
@@ -133,12 +118,16 @@ pub fn ask_bar_view(props: &AskBarViewProps) -> Html {
                                 </div>
                             </div>
                         } else {
-                            <button onclick={props.on_click.clone()} class="flex items-center justify-center rounded border border-white/30 hover:border-white/70 hover:bg-white/10 transition-colors p-1 text-white">
+                            <button
+                                onclick={props.on_click.clone()}
+                                class="flex items-center justify-center rounded border border-white/25 hover:border-white/70 hover:bg-white/10 bg-white/[0.04] transition-all p-1 text-white cursor-pointer"
+                                title="Send message (Enter)"
+                            >
                                 <ArrowUpIcon />
                             </button>
                         }
                     </div>
-                 </div>
+                </div>
             </div>
         </div>
       </div>
