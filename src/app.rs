@@ -1,4 +1,4 @@
-use crate::components::ask_bar::AskBar;
+use crate::components::AskBar;
 use yew::prelude::*;
 
 #[function_component(App)]

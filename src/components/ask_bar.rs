@@ -1,15 +1,55 @@
 use yew::prelude::*;
 
-use crate::components::chat::{AssistantCard, UserBubble};
+use crate::components::chat_bubble::{AssistantCard, UserBubble};
 use crate::components::command_palette::CommandPalette;
-use crate::components::common::{
-    ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon, InputCornerMarks, OuterCornerMarks,
-};
-use crate::components::loaders::LatticeLoader;
-use crate::types::{ChatTurn, Command, Commands};
+use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks};
+use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
+use crate::components::loader::LatticeLoader;
+use crate::components::mini_icon::MiniIcon;
+use crate::hooks::{use_chat, use_input, use_window};
+use crate::models::{ChatTurn, Command, Commands};
+
+/// The whole widget: wires the three hooks to the views below.
+#[function_component(AskBar)]
+pub fn ask_bar() -> Html {
+    let input_ref = use_node_ref();
+    let chat = use_chat();
+    let input = use_input(input_ref.clone(), chat.send.clone());
+    let window = use_window(
+        input_ref.clone(),
+        (chat.history.clone(), chat.is_loading, input.text.clone(), input.commands.len()),
+    );
+
+    if window.is_mini {
+        return html! {
+            <div class="w-full h-full flex items-center justify-center p-0.5 animate-scale-in">
+                <MiniIcon on_expand={window.on_expand} />
+            </div>
+        };
+    }
+
+    html! {
+        <div class="w-full animate-fade-in">
+            <AskBarView
+                input_ref={input_ref}
+                on_click={input.on_send_click}
+                on_keydown={input.on_keydown}
+                on_mousedown={window.on_mousedown}
+                history={chat.history}
+                is_loading={chat.is_loading}
+                commands={input.commands}
+                selected_cmd_index={input.selected_index}
+                on_cmd_select={input.on_cmd_select}
+                on_cmd_hover={input.on_cmd_hover}
+                on_input={input.on_input}
+                on_regenerate={chat.regenerate}
+            />
+        </div>
+    }
+}
 
 #[derive(Properties, PartialEq)]
-pub struct AskBarViewProps {
+struct AskBarViewProps {
     pub input_ref: NodeRef,
     pub on_click: Callback<MouseEvent>,
     pub on_keydown: Callback<KeyboardEvent>,
@@ -25,7 +65,7 @@ pub struct AskBarViewProps {
 }
 
 #[function_component(AskBarView)]
-pub fn ask_bar_view(props: &AskBarViewProps) -> Html {
+fn ask_bar_view(props: &AskBarViewProps) -> Html {
     let is_expanded = !props.history.is_empty() || props.is_loading;
 
     html! {

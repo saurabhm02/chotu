@@ -1,7 +1,9 @@
+mod api;
 mod app;
 mod components;
-mod services;
-mod types;
+mod hooks;
+mod models;
+mod utils;
 
 use app::App;
 

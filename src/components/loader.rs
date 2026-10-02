@@ -22,8 +22,10 @@ pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
     {
         let elapsed_tenths = elapsed_tenths.clone();
         use_effect_with((), move |_| {
+            // Use wall-clock time: the captured state handle is stale (always 0).
+            let started = js_sys::Date::now();
             let handle = Interval::new(100, move || {
-                elapsed_tenths.set(*elapsed_tenths + 1);
+                elapsed_tenths.set(((js_sys::Date::now() - started) / 100.0) as u32);
             });
             move || drop(handle)
         });

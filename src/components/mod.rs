@@ -1,5 +1,9 @@
 pub mod ask_bar;
-pub mod chat;
+pub mod chat_bubble;
 pub mod command_palette;
-pub mod common;
-pub mod loaders;
+pub mod corner_marks;
+pub mod icons;
+pub mod loader;
+pub mod mini_icon;
+
+pub use ask_bar::AskBar;
