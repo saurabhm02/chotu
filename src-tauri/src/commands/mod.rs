@@ -1,2 +1,3 @@
-pub mod ai;
-pub mod websearch;
+pub mod chat;
+pub mod web;
+pub mod window;

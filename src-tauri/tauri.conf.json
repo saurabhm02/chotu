@@ -16,11 +16,11 @@
         "title": "ty",
         "width": 450,
         "height": 55,
-        "resizable": true,
+        "resizable": false,
         "decorations": false, 
-        "minWidth": 450,
+        "minWidth": 50,
         "maxWidth": 550,
-        "minHeight": 55,
+        "minHeight": 50,
         "maxHeight": 600,
         "alwaysOnTop": true
       }

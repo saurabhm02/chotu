@@ -1,6 +1,6 @@
 use tauri::ipc::Channel;
 
-use crate::ai::client::AiClient;
+use crate::services::llm::AiClient;
 
 #[tauri::command]
 pub async fn ask_ai(channel: Channel<String>, query: String) -> Result<String, String> {
