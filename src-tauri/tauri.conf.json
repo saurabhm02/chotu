@@ -15,12 +15,12 @@
       {
         "title": "ty",
         "width": 450,
-        "height": 55,
+        "height": 40,
         "resizable": false,
         "decorations": false, 
         "minWidth": 50,
         "maxWidth": 550,
-        "minHeight": 50,
+        "minHeight": 36,
         "maxHeight": 600,
         "alwaysOnTop": true
       }

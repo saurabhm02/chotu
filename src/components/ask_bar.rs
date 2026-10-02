@@ -17,7 +17,12 @@ pub fn ask_bar() -> Html {
     let input = use_input(input_ref.clone(), chat.send.clone());
     let window = use_window(
         input_ref.clone(),
-        (chat.history.clone(), chat.is_loading, input.text.clone(), input.commands.len()),
+        (
+            chat.history.clone(),
+            chat.is_loading,
+            input.text.clone(),
+            input.commands.len(),
+        ),
     );
 
     if window.is_mini {
@@ -68,14 +73,27 @@ struct AskBarViewProps {
 fn ask_bar_view(props: &AskBarViewProps) -> Html {
     let is_expanded = !props.history.is_empty() || props.is_loading;
 
+    // Until the first chunk arrives the answer is empty, so we're still "Thinking";
+    // after that, text is streaming in.
+    let is_streaming = props
+        .history
+        .last()
+        .is_some_and(|turn| !turn.response.is_empty());
+    let loader_label = if is_streaming {
+        "Working on it"
+    } else {
+        "Thinking"
+    }
+    .to_string();
+
     html! {
       <div
         data-tauri-drag-region="true"
         onmousedown={props.on_mousedown.clone()}
         id="app-container"
         class={classes!(
-          "relative", "bg-black", "text-white", "w-full", "flex", "flex-col", "justify-end", "box-border", "select-none",
-          if is_expanded { "p-3 gap-2.5" } else { "p-2 gap-1.5" }
+          "relative", "bg-black", "text-white", "w-full", "flex", "flex-col", "justify-end", "box-border", "pb-0.5", "select-none",
+          if is_expanded { "gap-2.5" } else { "gap-1.5" }
         )}
       >
         if is_expanded {
@@ -83,7 +101,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
         }
 
         if is_expanded {
-            <div class="relative w-full flex-1 max-h-[420px] overflow-y-auto px-0.5 py-0.5 space-y-2.5 cmd-scroll">
+            <div class="relative w-full flex-1 max-h-[420px] overflow-y-auto px-3 pt-3 space-y-2.5 cmd-scroll">
                 { for props.history.iter().enumerate().map(|(idx, turn)| {
                     let on_regen = {
                         let on_regenerate = props.on_regenerate.clone();
@@ -110,7 +128,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
 
                 if props.is_loading {
                     <div class="flex justify-start py-0.5">
-                        <LatticeLoader label="Thinking" show_timer=true />
+                        <LatticeLoader label={loader_label} show_timer=true />
                     </div>
                 }
             </div>
@@ -125,7 +143,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
             />
         }
 
-        <div class="aura aura-dual w-full text-white/40 rounded-lg p-[1px] block">
+        <div class="aura aura-dual w-full text-white/40 rounded-lg p-[1px] block placeholder-base-100 ">
             <div class="relative w-full bg-black rounded-lg">
                 <InputCornerMarks />
                 <div class="px-2.5 py-1.5 flex items-center gap-2 justify-between">

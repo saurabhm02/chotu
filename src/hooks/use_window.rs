@@ -9,7 +9,7 @@ use crate::api::window::{resize_window, start_window_drag};
 
 const MINI_SIZE: f64 = 52.0;
 const EXPANDED_WIDTH: f64 = 550.0;
-const MIN_HEIGHT: f64 = 55.0;
+const MIN_HEIGHT: f64 = 36.0;
 const MAX_HEIGHT: f64 = 600.0;
 /// Clicking any of these should never start a window drag.
 const INTERACTIVE_TAGS: [&str; 6] = ["textarea", "input", "button", "svg", "path", "a"];
@@ -47,8 +47,8 @@ pub struct WindowHandle {
 pub fn use_window<D: PartialEq + 'static>(input_ref: NodeRef, content: D) -> WindowHandle {
     let is_mini = use_reducer(MiniState::default);
 
-    listen_for_global_toggle(&is_mini);
-    resize_native_window_on_change(&is_mini, &input_ref, content);
+    use_global_toggle_listener(&is_mini);
+    use_native_window_resize(&is_mini, &input_ref, content);
 
     let on_expand = {
         let is_mini = is_mini.clone();
@@ -66,7 +66,8 @@ pub fn use_window<D: PartialEq + 'static>(input_ref: NodeRef, content: D) -> Win
 
 /// Subscribes once to the backend's global shortcut event (e.g. Cmd+/), which
 /// can flip mini mode even while the app isn't focused.
-fn listen_for_global_toggle(is_mini: &UseReducerHandle<MiniState>) {
+#[hook]
+fn use_global_toggle_listener(is_mini: &UseReducerHandle<MiniState>) {
     let is_mini = is_mini.clone();
     use_effect_with((), move |_| {
         listen_to_event("toggle-floating-mode", move || {
@@ -78,7 +79,8 @@ fn listen_for_global_toggle(is_mini: &UseReducerHandle<MiniState>) {
 
 /// Resizes the real OS window whenever mini mode or the content changes:
 /// a tiny square in mini mode, otherwise just tall enough for the content.
-fn resize_native_window_on_change<D: PartialEq + 'static>(
+#[hook]
+fn use_native_window_resize<D: PartialEq + 'static>(
     is_mini: &UseReducerHandle<MiniState>,
     input_ref: &NodeRef,
     content: D,

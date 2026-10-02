@@ -2,7 +2,7 @@ use gloo_timers::callback::Timeout;
 use yew::prelude::*;
 
 use crate::api::clipboard::copy_to_clipboard;
-use crate::components::icons::{CheckIcon, CopyIcon, GlobeIcon, MoreHorizontalIcon, RegenerateIcon};
+use crate::components::icons::{CheckIcon, CopyIcon, GlobeIcon, RegenerateIcon};
 use crate::utils::markdown::render_markdown_to_html;
 
 // User message
@@ -46,17 +46,15 @@ pub fn assistant_card(props: &AssistantCardProps) -> Html {
 
     html! {
         <div class="flex justify-start w-full select-text">
-            <div class="w-full bg-[#13151b]/90 backdrop-blur-md rounded-xl border border-white/[0.08] shadow-[0_2px_16px_rgba(0,0,0,0.4)] px-3.5 py-2.5 sm:px-4 sm:py-3 flex flex-col transition-all">
-                <MarkdownView content={props.response.clone()} />
+            <div class="w-full bg-transparent backdrop-blur-md rounded-xl border border-white/[0.08] shadow-[0_2px_16px_rgba(0,0,0,0.4)] px-3.5 py-2.5 sm:px-4 sm:py-3 flex flex-col transition-all">
+                <MarkdownView
+                    content={props.response.clone()}
+                    on_regenerate={props.on_regenerate.clone()}
+                />
 
                 if !props.sources.is_empty() {
                     <SourcesChips sources={props.sources.clone()} />
                 }
-
-                <ActionBar
-                    text_to_copy={props.response.clone()}
-                    on_regenerate={props.on_regenerate.clone()}
-                />
             </div>
         </div>
     }
@@ -100,7 +98,7 @@ pub fn action_bar(props: &ActionBarProps) -> Html {
     };
 
     html! {
-        <div class="flex items-center gap-1 text-neutral-400 mt-2 pt-1.5 border-t border-white/[0.06] select-none">
+        <div class="flex items-center justify-end gap-1 text-neutral-200 select-none">
             <button
                 onclick={on_copy}
                 title="Copy response"
@@ -108,10 +106,10 @@ pub fn action_bar(props: &ActionBarProps) -> Html {
             >
                 if *copied {
                     <CheckIcon class="w-3 h-3 text-neutral-200" />
-                    <span class="text-neutral-200 font-medium">{"Copied"}</span>
-                } else {
+                     // <span class="text-neutral-200 font-medium">{"Copied"}</span>
+                 } else {
                     <CopyIcon class="w-3 h-3" />
-                    <span class="text-neutral-400 hover:text-neutral-200">{"Copy"}</span>
+                    // <span class="text-neutral-400 hover:text-neutral-200">{"Copy"}</span>
                 }
             </button>
 
@@ -122,16 +120,16 @@ pub fn action_bar(props: &ActionBarProps) -> Html {
                     class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
                 >
                     <RegenerateIcon class="w-3 h-3" />
-                    <span class="text-neutral-400 hover:text-neutral-200">{"Regenerate"}</span>
+                    // <span class="text-neutral-400 hover:text-neutral-200">{"Regenerate"}</span>
                 </button>
             }
 
-            <button
-                title="More options"
-                class="p-0.5 rounded text-[11px] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer ml-auto text-neutral-500 hover:text-neutral-300"
-            >
-                <MoreHorizontalIcon class="w-3.5 h-3.5" />
-            </button>
+            // <button
+                // title="More options"
+                // class="p-0.5 rounded text-[11px] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer ml-auto text-neutral-500 hover:text-neutral-300"
+            // >
+                // <MoreHorizontalIcon class="w-3.5 h-3.5" />
+            // </button>
         </div>
     }
 }
@@ -183,14 +181,22 @@ pub fn sources_chips(props: &SourcesChipsProps) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct MarkdownViewProps {
     pub content: String,
+    #[prop_or_default]
+    pub on_regenerate: Option<Callback<()>>,
 }
 
 #[function_component(MarkdownView)]
 pub fn markdown_view(props: &MarkdownViewProps) -> Html {
     let html_content = render_markdown_to_html(&props.content);
     html! {
-        <div class="markdown-content w-full select-text">
-            { Html::from_html_unchecked(AttrValue::from(html_content)) }
+        <div class="w-full flex flex-col select-text">
+            <div class="markdown-content w-full min-w-0">
+                { Html::from_html_unchecked(AttrValue::from(html_content)) }
+            </div>
+            <ActionBar
+                text_to_copy={props.content.clone()}
+                on_regenerate={props.on_regenerate.clone()}
+            />
         </div>
     }
 }

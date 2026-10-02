@@ -19,7 +19,9 @@ pub struct InputHandle {
     pub on_cmd_hover: Callback<usize>,
 }
 
-/// Text box state, slash-command popup, and submit. `on_submit` gets the trimmed text.
+/// The text box: typed text, the slash-command popup (filtering + keyboard
+/// navigation), and submitting a message. `on_submit` fires with the trimmed
+/// text whenever the user sends a message.
 #[hook]
 pub fn use_input(input_ref: NodeRef, on_submit: Callback<String>) -> InputHandle {
     let text = use_state(String::new);

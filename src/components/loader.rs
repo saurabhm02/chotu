@@ -55,9 +55,9 @@ pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
     let tenths = *elapsed_tenths;
     let seconds = (tenths as f64) / 10.0;
     let timer_str = format!("{:.1}s", seconds);
-
+    // bg-[#181a20]/90
     html! {
-        <div class="inline-flex items-center gap-2 text-white select-none px-3 py-1.5 bg-[#181a20]/90 backdrop-blur-md rounded-xl border border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+        <div class="inline-flex items-center gap-2 text-white select-none px-3 py-1.5 backdrop-blur-md rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
             <div
                 class="grid grid-cols-3 shrink-0"
                 style={format!(
