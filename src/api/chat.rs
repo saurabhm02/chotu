@@ -4,8 +4,12 @@ use wasm_bindgen::prelude::*;
 use super::tauri::{invoke, Channel};
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct AskInput {
     query: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    quoted_text: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -16,11 +20,17 @@ pub struct WebSearchResponse {
 
 /// Call a backend command that streams text chunks through a `Channel`,
 /// forwarding each chunk to `on_chunk`, and return the command's final value.
-async fn invoke_llm<F>(cmd: &str, query: String, mut on_chunk: F) -> Result<JsValue, String>
+async fn invoke_llm<F>(
+    cmd: &str,
+    query: String,
+    quoted_text: Option<String>,
+    mut on_chunk: F,
+) -> Result<JsValue, String>
 where
     F: FnMut(String) + 'static,
 {
-    let args = serde_wasm_bindgen::to_value(&AskInput { query }).map_err(|e| e.to_string())?;
+    let args = serde_wasm_bindgen::to_value(&AskInput { query, quoted_text })
+        .map_err(|e| e.to_string())?;
 
     let channel = Channel::new();
     let closure = Closure::wrap(Box::new(move |payload: JsValue| {
@@ -39,11 +49,15 @@ where
     res.map_err(|e| e.as_string().unwrap_or_else(|| format!("{e:?}")))
 }
 
-pub async fn invoke_ask_ai<F>(query: String, on_chunk: F) -> Result<String, String>
+pub async fn invoke_ask_ai<F>(
+    query: String,
+    quoted_text: Option<String>,
+    on_chunk: F,
+) -> Result<String, String>
 where
     F: FnMut(String) + 'static,
 {
-    let res = invoke_llm("ask_ai", query, on_chunk).await?;
+    let res = invoke_llm("ask_ai", query, quoted_text, on_chunk).await?;
     res.as_string()
         .ok_or_else(|| "Failed to parse response string".to_string())
 }
@@ -52,6 +66,6 @@ pub async fn invoke_ask_web<F>(query: String, on_chunk: F) -> Result<WebSearchRe
 where
     F: FnMut(String) + 'static,
 {
-    let res = invoke_llm("ask_web", query, on_chunk).await?;
+    let res = invoke_llm("ask_web", query, None, on_chunk).await?;
     serde_wasm_bindgen::from_value(res).map_err(|e| e.to_string())
 }

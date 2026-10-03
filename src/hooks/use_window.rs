@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlTextAreaElement;
 use yew::prelude::*;
 
-use crate::api::tauri::listen_to_event;
+use crate::api::tauri::{listen_to_event, listen_to_text_event};
 use crate::api::window::{resize_window, start_window_drag};
 
 const MINI_SIZE: f64 = 52.0;
@@ -70,8 +70,13 @@ pub fn use_window<D: PartialEq + 'static>(input_ref: NodeRef, content: D) -> Win
 fn use_global_toggle_listener(is_mini: &UseReducerHandle<MiniState>) {
     let is_mini = is_mini.clone();
     use_effect_with((), move |_| {
+        let is_mini_for_toggle = is_mini.clone();
         listen_to_event("toggle-floating-mode", move || {
-            is_mini.dispatch(MiniAction::Toggle);
+            is_mini_for_toggle.dispatch(MiniAction::Toggle);
+        });
+        // Selected text arrived: always open (never collapse) so it can be shown.
+        listen_to_text_event("selected-text", move |_| {
+            is_mini.dispatch(MiniAction::Set(false));
         });
         || ()
     });

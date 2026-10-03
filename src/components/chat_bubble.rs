@@ -10,6 +10,8 @@ use crate::utils::markdown::render_markdown_to_html;
 pub struct UserBubbleProps {
     pub prompt: String,
     pub timestamp: String,
+    #[prop_or_default]
+    pub quote: Option<String>,
 }
 
 #[function_component(UserBubble)]
@@ -17,6 +19,11 @@ pub fn user_bubble(props: &UserBubbleProps) -> Html {
     html! {
         <div class="flex justify-end w-full select-text">
             <div class="bg-[#1c1f26]/90 backdrop-blur-md text-neutral-100 rounded-xl border border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.3)] max-w-[80%] w-fit px-3 py-1.5 flex flex-col">
+                if let Some(quote) = &props.quote {
+                    <div class="mb-1 pl-2 border-l-2 border-red-400/70 italic text-[12px] leading-snug text-neutral-400 line-clamp-3 break-words">
+                        { format!("“{quote}”") }
+                    </div>
+                }
                 <div class="text-[13px] leading-relaxed font-normal whitespace-pre-wrap break-words text-neutral-100">
                     {&props.prompt}
                 </div>

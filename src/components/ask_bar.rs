@@ -2,11 +2,11 @@ use yew::prelude::*;
 
 use crate::components::chat_bubble::{AssistantCard, UserBubble};
 use crate::components::command_palette::CommandPalette;
-use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks};
+use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks, SelectionCornerMarks};
 use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
 use crate::components::loader::LatticeLoader;
 use crate::components::mini_icon::MiniIcon;
-use crate::hooks::{use_chat, use_input, use_window};
+use crate::hooks::{use_chat, use_input, use_selection, use_window};
 use crate::models::{ChatTurn, Command, Commands};
 
 /// The whole widget: wires the three hooks to the views below.
@@ -14,7 +14,21 @@ use crate::models::{ChatTurn, Command, Commands};
 pub fn ask_bar() -> Html {
     let input_ref = use_node_ref();
     let chat = use_chat();
-    let input = use_input(input_ref.clone(), chat.send.clone());
+    let selection = use_selection();
+
+    // Send the question together with the highlighted text (if any), then clear it.
+    let send_with_selection = {
+        let send = chat.send.clone();
+        let selected_text = selection.text.clone();
+        let clear_selection = selection.clear.clone();
+
+        Callback::from(move |question: String| {
+            send.emit((question, selected_text.clone()));
+            clear_selection.emit(());
+        })
+    };
+
+    let input = use_input(input_ref.clone(), send_with_selection);
     let window = use_window(
         input_ref.clone(),
         (
@@ -22,8 +36,10 @@ pub fn ask_bar() -> Html {
             chat.is_loading,
             input.text.clone(),
             input.commands.len(),
+            selection.text.clone(),
         ),
     );
+    let on_clear_selection = selection.clear.reform(|_: MouseEvent| ());
 
     if window.is_mini {
         return html! {
@@ -48,6 +64,8 @@ pub fn ask_bar() -> Html {
                 on_cmd_hover={input.on_cmd_hover}
                 on_input={input.on_input}
                 on_regenerate={chat.regenerate}
+                selected_text={selection.text.clone()}
+                on_clear_selection={on_clear_selection}
             />
         </div>
     }
@@ -67,6 +85,8 @@ struct AskBarViewProps {
     pub on_cmd_select: Callback<Commands>,
     pub on_cmd_hover: Callback<usize>,
     pub on_regenerate: Callback<usize>,
+    pub selected_text: Option<String>,
+    pub on_clear_selection: Callback<MouseEvent>,
 }
 
 #[function_component(AskBarView)]
@@ -111,8 +131,9 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     };
                     html! {
                         <div key={idx} class="flex flex-col gap-2 w-full">
-                            <UserBubble
+                           <UserBubble
                                 prompt={turn.prompt.clone()}
+                                quote={turn.quote.clone()}
                                 timestamp={turn.timestamp.clone()}
                             />
                             if !turn.response.is_empty() {
@@ -143,9 +164,31 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
             />
         }
 
+
         <div class="aura aura-dual w-full text-white/40 rounded-lg p-[1px] block placeholder-base-100 ">
             <div class="relative w-full bg-black rounded-lg">
                 <InputCornerMarks />
+
+                // Selected text: sits inside the input frame, above the input row.
+                if let Some(text) = &props.selected_text {
+                    <div class="flex px-3 pt-3">
+                        <div class="relative w-fit max-w-full min-w-0 pl-3 pr-6 py-1.5">
+                            <SelectionCornerMarks />
+                            <p class="italic text-[12px] leading-snug text-neutral-300 line-clamp-3 break-words">
+                                { format!("“{text}”") }
+                            </p>
+                            // Sits where a top-right bracket would be.
+                            <button
+                                onclick={props.on_clear_selection.clone()}
+                                title="Remove selected text"
+                                class="absolute -top-0.5 right-0 z-20 text-[16px] leading-none text-white cursor-pointer"
+                            >
+                                {"×"}
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 <div class="px-2.5 py-1.5 flex items-center gap-2 justify-between">
                     <div class="flex items-center justify-center w-5 shrink-0 text-neutral-400 hover:text-white transition-colors cursor-pointer">
                         <DoubleChevronUpIcon />

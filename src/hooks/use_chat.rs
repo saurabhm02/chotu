@@ -50,8 +50,9 @@ impl Reducible for History {
 pub struct ChatHandle {
     pub history: Vec<ChatTurn>,
     pub is_loading: bool,
-    /// Send a prompt (plain text or `/command ...`). Streams the reply into `history`.
-    pub send: Callback<String>,
+    /// Send (what the user typed, text they had highlighted in another app).
+    /// Streams the reply into `history`.
+    pub send: Callback<(String, Option<String>)>,
     /// Re-send the prompt already sitting at this position in `history`.
     pub regenerate: Callback<usize>,
 }
@@ -66,7 +67,7 @@ pub fn use_chat() -> ChatHandle {
         let history = history.clone();
         let is_loading = is_loading.clone();
 
-        Callback::from(move |raw_text: String| {
+        Callback::from(move |(raw_text, quote): (String, Option<String>)| {
             let prompt = raw_text.trim().to_string();
             if prompt.is_empty() {
                 return;
@@ -74,7 +75,9 @@ pub fn use_chat() -> ChatHandle {
 
             let history = history.clone();
             let is_loading = is_loading.clone();
-            wasm_bindgen_futures::spawn_local(send_and_stream_reply(history, is_loading, prompt));
+            wasm_bindgen_futures::spawn_local(send_and_stream_reply(
+                history, is_loading, prompt, quote,
+            ));
         })
     };
 
@@ -83,7 +86,7 @@ pub fn use_chat() -> ChatHandle {
         let history = history.clone();
         Callback::from(move |turn_index: usize| {
             if let Some(turn) = history.0.get(turn_index) {
-                send.emit(turn.prompt.clone());
+                send.emit((turn.prompt.clone(), turn.quote.clone()));
             }
         })
     };
@@ -102,13 +105,16 @@ async fn send_and_stream_reply(
     history: UseReducerHandle<History>,
     is_loading: UseStateHandle<bool>,
     prompt: String,
+    quote: Option<String>,
 ) {
     is_loading.set(true);
 
+    // `query` is what's left after removing a leading "/command".
     let (command, query) = detect_cmd(&prompt);
 
     history.dispatch(HistoryAction::StartTurn(ChatTurn {
-        prompt: query.clone(),
+        prompt: prompt.clone(), // shown exactly as typed, e.g. "/web rust news"
+        quote: quote.clone(),
         response: String::new(),
         sources: vec![],
         timestamp: current_time_str(),
@@ -119,7 +125,7 @@ async fn send_and_stream_reply(
         history_for_chunks.dispatch(HistoryAction::AppendToLastTurn(chunk));
     };
 
-    let (response, sources) = run_cmd(command, query, on_chunk).await;
+    let (response, sources) = run_cmd(command, query, quote, on_chunk).await;
 
     history.dispatch(HistoryAction::FinishLastTurn { response, sources });
     is_loading.set(false);

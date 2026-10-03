@@ -53,3 +53,22 @@ where
         closure.forget();
     });
 }
+
+/// Run `callback` with the text payload every time the backend emits `name`.
+pub fn listen_to_text_event<F>(name: &'static str, mut callback: F)
+where
+    F: FnMut(String) + 'static,
+{
+    let closure = Closure::wrap(Box::new(move |event: JsValue| {
+        let payload = js_sys::Reflect::get(&event, &JsValue::from_str("payload")).ok();
+        if let Some(text) = payload.and_then(|p| p.as_string()) {
+            callback(text);
+        }
+    }) as Box<dyn FnMut(JsValue)>);
+
+    let promise = listen(name, &closure);
+    wasm_bindgen_futures::spawn_local(async move {
+        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+        closure.forget();
+    });
+}
