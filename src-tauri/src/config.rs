@@ -11,3 +11,15 @@ pub const DDG_URL: &str = "https://html.duckduckgo.com/html/";
 pub const TIMEOUT_S: u64 = 5;
 pub const PAGE_CONTENT_CHAR: usize = 1500;
 pub const TOP_PAGE_K: usize = 5;
+
+/// Vision models tried in this order when `AI_VISION_MODEL` is not set.
+pub const DEFAULT_VISION_MODELS: [&str; 3] = [
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+];
+
+pub const ALL_MODELS_FAILED_MESSAGE: &str =
+    "The AI service is not answering right now. Please try again in a minute.";
+
+pub const WRONG_API_KEY_MESSAGE: &str = "The API key is incorrect.";

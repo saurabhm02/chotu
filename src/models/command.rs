@@ -33,12 +33,12 @@ pub fn all_commands() -> Vec<Command> {
         },
         Command {
             name: "ss",
-            description: "Analyze content",
+            description: "Read text from your screen",
             cmd: Commands::Analyze,
         },
         Command {
             name: "screen",
-            description: "Capture screen region",
+            description: "Show your screen to the AI",
             cmd: Commands::Screen,
         },
     ]

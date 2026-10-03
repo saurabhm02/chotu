@@ -2,6 +2,7 @@ pub mod commands;
 pub mod config;
 pub mod models;
 pub mod services;
+pub mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,7 +23,9 @@ pub fn run() {
             commands::chat::ask_ai,
             commands::web::ask_web,
             commands::window::keep_window_on_screen,
-            commands::screen::capture_screen
+            commands::ocr::extract_text,
+            commands::screen::capture_screen,
+            commands::screen::capture_region
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2864,6 +2864,8 @@ dependencies = [
  "num-traits",
  "png 0.18.1",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -6429,12 +6431,14 @@ dependencies = [
  "accessibility",
  "arboard",
  "async-openai",
+ "base64 0.23.1",
  "chrono",
  "core-foundation 0.10.1",
  "dotenvy",
  "enigo",
  "env_logger",
  "futures",
+ "image",
  "log",
  "objc2",
  "objc2-foundation",

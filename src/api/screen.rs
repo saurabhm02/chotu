@@ -1,6 +1,7 @@
 use super::tauri::invoke;
 use crate::models::screen::ScreenShot;
 
+/// Screenshot of the whole display.
 pub async fn invoke_capture_screen() -> Result<ScreenShot, String> {
     let no_args = js_sys::Object::new();
     let res = invoke("capture_screen", no_args.into())

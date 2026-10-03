@@ -3,13 +3,24 @@ use wasm_bindgen::prelude::*;
 
 use super::tauri::{invoke, Channel};
 
+#[derive(Clone, Default, Debug)]
+pub struct Attachments {
+    /// Extra text for the model to read (highlighted text, text from the screen...).
+    pub context: Option<String>,
+    /// Screenshot files to show the model (`/screen`).
+    pub image_paths: Vec<String>,
+}
+
+/// What we send to the backend. `camelCase` because Tauri expects names like
+/// `imagePaths` and maps them to `image_paths` in Rust. Empty attachments are left out.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct AskInput {
     query: String,
-
     #[serde(skip_serializing_if = "Option::is_none")]
-    quoted_text: Option<String>,
+    context: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    image_paths: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -23,14 +34,18 @@ pub struct WebSearchResponse {
 async fn invoke_llm<F>(
     cmd: &str,
     query: String,
-    quoted_text: Option<String>,
+    attachments: Attachments,
     mut on_chunk: F,
 ) -> Result<JsValue, String>
 where
     F: FnMut(String) + 'static,
 {
-    let args = serde_wasm_bindgen::to_value(&AskInput { query, quoted_text })
-        .map_err(|e| e.to_string())?;
+    let input = AskInput {
+        query,
+        context: attachments.context,
+        image_paths: attachments.image_paths,
+    };
+    let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;
 
     let channel = Channel::new();
     let closure = Closure::wrap(Box::new(move |payload: JsValue| {
@@ -51,13 +66,13 @@ where
 
 pub async fn invoke_ask_ai<F>(
     query: String,
-    quoted_text: Option<String>,
+    attachments: Attachments,
     on_chunk: F,
 ) -> Result<String, String>
 where
     F: FnMut(String) + 'static,
 {
-    let res = invoke_llm("ask_ai", query, quoted_text, on_chunk).await?;
+    let res = invoke_llm("ask_ai", query, attachments, on_chunk).await?;
     res.as_string()
         .ok_or_else(|| "Failed to parse response string".to_string())
 }
@@ -66,6 +81,7 @@ pub async fn invoke_ask_web<F>(query: String, on_chunk: F) -> Result<WebSearchRe
 where
     F: FnMut(String) + 'static,
 {
-    let res = invoke_llm("ask_web", query, None, on_chunk).await?;
+    let res = invoke_llm("ask_web", query, Attachments::default(), on_chunk).await?;
     serde_wasm_bindgen::from_value(res).map_err(|e| e.to_string())
 }
+

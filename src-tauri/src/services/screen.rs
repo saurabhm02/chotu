@@ -1,62 +1,93 @@
-//! Taking a screenshot of the display. On macOS this uses the built-in
-//! `screencapture` tool and saves a PNG in the app's cache folder.
-
+//! Taking screenshots. On macOS this uses the built-in `screencapture` tool and
+//! saves PNG files in the app's cache folder.
 #[cfg(target_os = "macos")]
 mod mac {
     use std::path::{Path, PathBuf};
     use std::time::Duration;
 
-    use crate::models::screen::ScreenShot;
     use tauri::{AppHandle, Manager, Runtime};
+
+    use crate::models::screen::ScreenShot;
 
     #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
         fn CGPreflightScreenCaptureAccess() -> bool;
         fn CGRequestScreenCaptureAccess() -> bool;
     }
+
+    enum Mode {
+        /// The whole main display
+        Display,
+        Region,
+    }
+
     /// Without the Screen Recording permission macOS silently gives a screenshot
-    /// with no app windows in it. So check first, and trigger the system prompt
+    /// with no app windows in it. So check first, and trigger the system prompt.
     fn ensure_screen_permission() -> Result<(), String> {
         if unsafe { CGPreflightScreenCaptureAccess() } {
             return Ok(());
         }
-
         unsafe { CGRequestScreenCaptureAccess() };
         Err("Screen Recording permission is needed. Allow it in System Settings → Privacy & Security → Screen & System Audio Recording, then restart TY.".to_string())
     }
 
+    /// The whole main display.
     pub async fn capture_display<R: Runtime>(app: &AppHandle<R>) -> Result<ScreenShot, String> {
+        capture(app, Mode::Display)
+            .await?
+            .ok_or_else(|| "the screenshot file was not created".to_string())
+    }
+
+    /// A box the user drags. `None` means they pressed Esc.
+    pub async fn capture_region<R: Runtime>(
+        app: &AppHandle<R>,
+    ) -> Result<Option<ScreenShot>, String> {
+        capture(app, Mode::Region).await
+    }
+
+    async fn capture<R: Runtime>(
+        app: &AppHandle<R>,
+        mode: Mode,
+    ) -> Result<Option<ScreenShot>, String> {
         ensure_screen_permission()?;
 
         let id = uuid::Uuid::new_v4().simple().to_string();
         let path = screen_dir(app)?.join(format!("{id}.png"));
 
-        // Hide TY so it isn't in the picture, and always bring it back after
+        // Hide TY so it isn't in the picture, and always bring it back after.
         let window = app.get_webview_window("main");
         if let Some(window) = &window {
             let _ = window.hide();
         }
 
-        // Give macOS a moment to really remove the window from the screen
+        // Give macOS a moment to really remove the window from the screen.
         tokio::time::sleep(Duration::from_millis(250)).await;
 
-        let captured = take_screenshot(&path).await;
+        let finished = run_screencapture(&path, &mode).await;
 
         if let Some(window) = &window {
             let _ = window.show();
             let _ = window.set_focus();
         }
-        captured?;
+        finished?;
+
+        // Pressing Esc while dragging ends `screencapture` without making a file.
+        if !path.exists() {
+            return match mode {
+                Mode::Region => Ok(None),
+                Mode::Display => Err("the screenshot file was not created".to_string()),
+            };
+        }
 
         let (width, height) = png_size(&path)?;
         log::info!("screen captured: {} ({width}x{height})", path.display());
 
-        Ok(ScreenShot {
+        Ok(Some(ScreenShot {
             id,
             image_path: path.to_string_lossy().into_owned(),
             width,
             height,
-        })
+        }))
     }
 
     fn screen_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -69,9 +100,13 @@ mod mac {
         Ok(dir)
     }
 
-    /// `-x` = no camera sound, `-t png` = PNG file. Captures the main display
-    async fn take_screenshot(path: &Path) -> Result<(), String> {
-        let status = tokio::process::Command::new("screencapture")
+    /// `-x` = no camera sound, `-t png` = PNG file, `-i` = let the user drag a box.
+    async fn run_screencapture(path: &Path, mode: &Mode) -> Result<(), String> {
+        let mut command = tokio::process::Command::new("screencapture");
+        if matches!(mode, Mode::Region) {
+            command.arg("-i");
+        }
+        let status = command
             .args(["-x", "-t", "png"])
             .arg(path)
             .status()
@@ -104,12 +139,19 @@ mod mac {
 }
 
 #[cfg(target_os = "macos")]
-pub use mac::capture_display;
+pub use mac::{capture_display, capture_region};
 
 #[cfg(not(target_os = "macos"))]
 pub async fn capture_display<R: tauri::Runtime>(
     _app: &tauri::AppHandle<R>,
 ) -> Result<crate::models::screen::ScreenShot, String> {
+    Err("Screen capture only works on macOS for now.".to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub async fn capture_region<R: tauri::Runtime>(
+    _app: &tauri::AppHandle<R>,
+) -> Result<Option<crate::models::screen::ScreenShot>, String> {
     Err("Screen capture only works on macOS for now.".to_string())
 }
 
