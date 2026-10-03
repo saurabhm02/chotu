@@ -13,7 +13,10 @@ use std::env;
 use std::sync::OnceLock;
 use tauri::ipc::Channel;
 
-use crate::config::{DEFAULT_SYSTEM_PROMPT, WEB_PROMPT_TEMPLATE};
+use crate::{
+    config::{DEFAULT_SYSTEM_PROMPT, WEB_PROMPT_TEMPLATE},
+    services::prompt,
+};
 
 pub struct AiClient {
     pub url: String,
@@ -120,22 +123,27 @@ impl AiClient {
     }
 
     /// Plain chat: default system prompt + the user's query.
-    pub async fn call_llm(&self, channel: &Channel<String>, query: &str) -> Result<String, String> {
+    pub async fn call_llm(
+        &self,
+        channel: &Channel<String>,
+        query: &str,
+        quoted_text: Option<&str>,
+    ) -> Result<String, String> {
+        let message = prompt::with_quote(query, quoted_text);
         log::info!(
             "sending streaming chat completion request to {} (model: {}), input: {:?}",
             self.url,
             self.model,
-            query
+            message
         );
         self.ask(
             channel,
             DEFAULT_SYSTEM_PROMPT.to_string(),
-            query,
+            &message,
             "empty text content response",
         )
         .await
     }
-
     /// Chat grounded on web sources (`blocks`), fenced as untrusted content.
     pub async fn call_llm_for_web(
         &self,

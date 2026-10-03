@@ -11,19 +11,18 @@ pub fn run() {
     let builder = tauri::Builder::default();
 
     #[cfg(desktop)]
-    let builder = builder
-        .plugin(services::shortcut::plugin())
-        .setup(|app| {
-            services::shortcut::register(app)?;
-            Ok(())
-        });
+    let builder = builder.plugin(services::shortcut::plugin()).setup(|app| {
+        services::shortcut::register(app)?;
+        Ok(())
+    });
 
     builder
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::chat::ask_ai,
             commands::web::ask_web,
-            commands::window::keep_window_on_screen
+            commands::window::keep_window_on_screen,
+            commands::screen::capture_screen
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
