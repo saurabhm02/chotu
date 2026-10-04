@@ -3,6 +3,7 @@ use std::rc::Rc;
 use yew::prelude::*;
 
 use crate::api::dispatcher::run_cmd;
+use crate::models::stream::{Phase, StreamEvent};
 use crate::models::{detect_cmd, ChatTurn};
 use crate::utils::time::current_time_str;
 
@@ -15,6 +16,12 @@ enum HistoryAction {
     StartTurn(ChatTurn),
     /// A new piece of streamed text just arrived — tack it onto the last turn.
     AppendToLastTurn(String),
+    /// The backend moved on (searching, reading, thinking).
+    SetStatus(Phase),
+    /// The pages we are about to read (title, url).
+    SetSources(Vec<(String, String)>),
+    /// The model that is answering.
+    SetModel(String),
     /// The AI is done — replace the last turn's answer with the final version.
     FinishLastTurn {
         response: String,
@@ -33,6 +40,21 @@ impl Reducible for History {
             HistoryAction::AppendToLastTurn(text) => {
                 if let Some(turn) = turns.last_mut() {
                     turn.response.push_str(&text);
+                }
+            }
+            HistoryAction::SetStatus(phase) => {
+                if let Some(turn) = turns.last_mut() {
+                    turn.status = Some(phase);
+                }
+            }
+            HistoryAction::SetSources(sources) => {
+                if let Some(turn) = turns.last_mut() {
+                    turn.sources = sources;
+                }
+            }
+            HistoryAction::SetModel(model) => {
+                if let Some(turn) = turns.last_mut() {
+                    turn.model = model;
                 }
             }
             HistoryAction::FinishLastTurn { response, sources } => {
@@ -117,15 +139,25 @@ async fn send_and_stream_reply(
         quote: quote.clone(),
         response: String::new(),
         sources: vec![],
+        status: None,
+        model: String::new(),
         timestamp: current_time_str(),
     }));
 
-    let history_for_chunks = history.clone();
-    let on_chunk = move |chunk: String| {
-        history_for_chunks.dispatch(HistoryAction::AppendToLastTurn(chunk));
+    let history_for_events = history.clone();
+    let on_event = move |event: StreamEvent| {
+        let action = match event {
+            StreamEvent::Token(text) => HistoryAction::AppendToLastTurn(text),
+            StreamEvent::Status(phase) => HistoryAction::SetStatus(phase),
+            StreamEvent::Sources(list) => HistoryAction::SetSources(
+                list.into_iter().map(|s| (s.title, s.url)).collect(),
+            ),
+            StreamEvent::Model(name) => HistoryAction::SetModel(name),
+        };
+        history_for_events.dispatch(action);
     };
 
-    let (response, sources) = run_cmd(command, query, quote, on_chunk).await;
+    let (response, sources) = run_cmd(command, query, quote, on_event).await;
 
     history.dispatch(HistoryAction::FinishLastTurn { response, sources });
     is_loading.set(false);

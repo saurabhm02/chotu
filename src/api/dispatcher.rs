@@ -1,3 +1,4 @@
+use crate::models::stream::{Phase, StreamEvent};
 use crate::models::Commands;
 use crate::utils::context::build_context;
 
@@ -9,11 +10,11 @@ use super::screen::invoke_capture_screen;
 pub type CommandResult = (String, Vec<(String, String)>);
 
 /// Plain chat, with whatever the user attached to the question.
-async fn ask_ai<F>(prompt: String, attachments: Attachments, on_chunk: F) -> CommandResult
+async fn ask_ai<F>(prompt: String, attachments: Attachments, on_event: F) -> CommandResult
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
-    match invoke_ask_ai(prompt, attachments, on_chunk).await {
+    match invoke_ask_ai(prompt, attachments, on_event).await {
         Ok(res) => (res, Vec::new()),
         Err(e) => error_result(e),
     }
@@ -41,11 +42,12 @@ fn question_or(question: String, fallback: &str) -> String {
 async fn ask_about_screen_text<F>(
     question: String,
     quote: Option<String>,
-    on_chunk: F,
+    mut on_event: F,
 ) -> CommandResult
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
+    on_event(StreamEvent::Status(Phase::Capturing));
     let shot = match invoke_capture_screen().await {
         Ok(shot) => shot,
         Err(e) => return error_result(e),
@@ -57,6 +59,7 @@ where
         shot.height
     );
 
+    on_event(StreamEvent::Status(Phase::ReadingText));
     let screen_text = match invoke_extract_text(shot.image_path).await {
         Ok(text) => text,
         Err(e) => return error_result(e),
@@ -66,10 +69,11 @@ where
         context: build_context(quote.as_deref(), Some(&screen_text)),
         ..Default::default()
     };
+    on_event(StreamEvent::Status(Phase::Thinking));
     ask_ai(
         question_or(question, "What is on my screen?"),
         attachments,
-        on_chunk,
+        on_event,
     )
     .await
 }
@@ -79,11 +83,12 @@ where
 async fn ask_about_screen_image<F>(
     question: String,
     quote: Option<String>,
-    on_chunk: F,
+    mut on_event: F,
 ) -> CommandResult
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
+    on_event(StreamEvent::Status(Phase::Capturing));
     let shot = match invoke_capture_screen().await {
         Ok(shot) => shot,
         Err(e) => return error_result(e),
@@ -99,10 +104,11 @@ where
         context: build_context(quote.as_deref(), None),
         image_paths: vec![shot.image_path],
     };
+    on_event(StreamEvent::Status(Phase::Thinking));
     ask_ai(
         question_or(question, "What is on this screen?"),
         attachments,
-        on_chunk,
+        on_event,
     )
     .await
 }
@@ -112,10 +118,10 @@ pub async fn run_cmd<F>(
     cmd: Option<Commands>,
     query: String,
     quote: Option<String>,
-    on_chunk: F,
+    on_event: F,
 ) -> CommandResult
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
     let quote_only = Attachments {
         context: build_context(quote.as_deref(), None),
@@ -123,9 +129,8 @@ where
     };
 
     match cmd {
-        None => ask_ai(query, quote_only, on_chunk).await,
-        // `/web` ignores highlighted text for now: a long quote makes a bad search.
-        Some(Commands::Web) => match invoke_ask_web(query, on_chunk).await {
+        None => ask_ai(query, quote_only, on_event).await,
+        Some(Commands::Web) => match invoke_ask_web(query, quote, on_event).await {
             Ok(res) => (res.ans, res.sources),
             Err(e) => error_result(e),
         },
@@ -133,12 +138,12 @@ where
             ask_ai(
                 format!("Explain the following clearly and concisely:\n\n{query}"),
                 quote_only,
-                on_chunk,
+                on_event,
             )
             .await
         }
-        Some(Commands::Analyze) => ask_about_screen_text(query, quote, on_chunk).await,
-        Some(Commands::Screen) => ask_about_screen_image(query, quote, on_chunk).await,
+        Some(Commands::Analyze) => ask_about_screen_text(query, quote, on_event).await,
+        Some(Commands::Screen) => ask_about_screen_image(query, quote, on_event).await,
         Some(Commands::Notes) => not_ready("Notes isn't wired up yet (coming in Phase 8)."),
     }
 }

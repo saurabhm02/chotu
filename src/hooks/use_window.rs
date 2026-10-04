@@ -10,7 +10,9 @@ use crate::api::window::{resize_window, start_window_drag};
 const MINI_SIZE: f64 = 52.0;
 const EXPANDED_WIDTH: f64 = 550.0;
 const MIN_HEIGHT: f64 = 36.0;
-const MAX_HEIGHT: f64 = 600.0;
+const MAX_HEIGHT: f64 = 700.0;
+/// While an answer streams in, resize the window at most this often (milliseconds).
+const RESIZE_EVERY_MS: f64 = 100.0;
 /// Clicking any of these should never start a window drag.
 const INTERACTIVE_TAGS: [&str; 6] = ["textarea", "input", "button", "svg", "path", "a"];
 
@@ -92,10 +94,32 @@ fn use_native_window_resize<D: PartialEq + 'static>(
 ) {
     let want_mini = is_mini.0;
     let input_ref = input_ref.clone();
+    // When the window was last resized (milliseconds).
+    let last_run = use_mut_ref(|| 0.0_f64);
+
     use_effect_with((content, want_mini), move |_| {
-        wasm_bindgen_futures::spawn_local(apply_window_size(want_mini, input_ref));
-        || ()
+        // Resize now if it has been a while, otherwise wait out the rest of the 100 ms.
+        let since_last = js_sys::Date::now() - *last_run.borrow();
+        let wait = (RESIZE_EVERY_MS - since_last).clamp(0.0, RESIZE_EVERY_MS);
+
+        let run = move || {
+            *last_run.borrow_mut() = js_sys::Date::now();
+            wasm_bindgen_futures::spawn_local(apply_window_size(want_mini, input_ref));
+        };
+        let pending = gloo_timers::callback::Timeout::new(wait as u32, run);
+
+        // New content arrived before the timer fired: dropping the timer cancels it.
+        move || drop(pending)
     });
+}
+
+/// Re-fit the window to its content. For changes the hook can't see,
+/// like opening the sources list inside an answer.
+pub fn refit_window() {
+    gloo_timers::callback::Timeout::new(30, || {
+        wasm_bindgen_futures::spawn_local(apply_window_size(false, NodeRef::default()));
+    })
+    .forget();
 }
 
 async fn apply_window_size(want_mini: bool, input_ref: NodeRef) {
@@ -128,9 +152,13 @@ fn measure_content_height() -> f64 {
     };
 
     let style = el.unchecked_ref::<web_sys::HtmlElement>().style();
+    // The container is capped to the window (so the input never leaves the screen).
+    // Lift the cap while measuring, so we learn the height the content really wants.
     let _ = style.set_property("width", &format!("{EXPANDED_WIDTH}px"));
+    let _ = style.set_property("max-height", "none");
     let height = el.scroll_height() as f64;
     let _ = style.remove_property("width");
+    let _ = style.remove_property("max-height");
     height
 }
 
