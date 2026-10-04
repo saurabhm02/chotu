@@ -5,5 +5,6 @@ pub mod corner_marks;
 pub mod icons;
 pub mod loader;
 pub mod mini_icon;
+pub mod sources;
 
 pub use ask_bar::AskBar;

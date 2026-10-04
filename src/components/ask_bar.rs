@@ -5,6 +5,7 @@ use crate::components::command_palette::CommandPalette;
 use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks, SelectionCornerMarks};
 use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
 use crate::components::loader::LatticeLoader;
+use crate::components::sources::StatusStrip;
 use crate::components::mini_icon::MiniIcon;
 use crate::hooks::{use_chat, use_input, use_selection, use_window};
 use crate::models::{ChatTurn, Command, Commands};
@@ -106,13 +107,16 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
     }
     .to_string();
 
+    // `/web` turns show the status strip instead of the plain loader.
+    let last_has_status = props.history.last().is_some_and(|turn| turn.status.is_some());
+
     html! {
       <div
         data-tauri-drag-region="true"
         onmousedown={props.on_mousedown.clone()}
         id="app-container"
         class={classes!(
-          "relative", "bg-black", "text-white", "w-full", "flex", "flex-col", "justify-end", "box-border", "pb-0.5", "select-none",
+          "relative", "bg-black", "text-white", "w-full", "max-h-screen", "flex", "flex-col", "justify-end", "box-border", "pb-0.5", "select-none",
           if is_expanded { "gap-2.5" } else { "gap-1.5" }
         )}
       >
@@ -121,7 +125,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
         }
 
         if is_expanded {
-            <div class="relative w-full flex-1 max-h-[420px] overflow-y-auto px-3 pt-3 space-y-2.5 cmd-scroll">
+            <div class="relative w-full flex-1 min-h-0 max-h-[700px] overflow-y-auto px-3 pt-3 space-y-2.5 cmd-scroll">
                 { for props.history.iter().enumerate().map(|(idx, turn)| {
                     let on_regen = {
                         let on_regenerate = props.on_regenerate.clone();
@@ -129,6 +133,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                             on_regenerate.emit(idx);
                         })
                     };
+                    let is_live = props.is_loading && idx + 1 == props.history.len();
                     html! {
                         <div key={idx} class="flex flex-col gap-2 w-full">
                            <UserBubble
@@ -136,10 +141,18 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                                 quote={turn.quote.clone()}
                                 timestamp={turn.timestamp.clone()}
                             />
+                            if let (true, Some(phase)) = (is_live, turn.status) {
+                                <StatusStrip
+                                    phase={phase}
+                                    sources={turn.sources.clone()}
+                                    answering={!turn.response.is_empty()}
+                                />
+                            }
                             if !turn.response.is_empty() {
                                 <AssistantCard
                                     response={turn.response.clone()}
                                     sources={turn.sources.clone()}
+                                    model={turn.model.clone()}
                                     on_regenerate={Some(on_regen)}
                                 />
                             }
@@ -147,7 +160,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     }
                 }) }
 
-                if props.is_loading {
+                if props.is_loading && !last_has_status {
                     <div class="flex justify-start py-0.5">
                         <LatticeLoader label={loader_label} show_timer=true />
                     </div>
