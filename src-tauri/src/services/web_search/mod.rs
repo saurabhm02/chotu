@@ -67,15 +67,21 @@ fn build_serp_blocks(items: &[SerpItem]) -> String {
         .join("\n\n")
 }
 
-/// Search, fetch the top pages, and return (items, prompt-ready source blocks).
-pub async fn web_search(query: &str, lang: &str) -> Result<(Vec<SerpItem>, String), String> {
-    let items = ddg::search_ddg(query, false, lang)
+/// Ask DuckDuckGo and keep the top `TOP_PAGE_K` results (titles and links only).
+/// An empty list is fine: the caller tells the AI that nothing was found.
+pub async fn search_top(query: &str, lang: &str) -> Result<Vec<SerpItem>, String> {
+    let mut items = ddg::search_ddg(query, false, lang)
         .await
         .map_err(|e| e.to_string())?;
+    items.truncate(TOP_PAGE_K);
+    Ok(items)
+}
+
+/// Download those pages and return (items, prompt-ready source blocks).
+pub async fn read_pages(items: Vec<SerpItem>) -> (Vec<SerpItem>, String) {
     let fetched = fetch_top_k(items, None).await;
     let blocks = build_serp_blocks(&fetched);
-
-    Ok((fetched, blocks))
+    (fetched, blocks)
 }
 
 #[cfg(test)]

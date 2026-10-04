@@ -12,13 +12,16 @@ use futures::StreamExt;
 use std::env;
 use std::path::Path;
 use std::sync::OnceLock;
+use std::time::Duration;
 use tauri::ipc::Channel;
 
 use crate::{
     config::{
         ALL_MODELS_FAILED_MESSAGE, DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS,
-        WEB_PROMPT_TEMPLATE, WRONG_API_KEY_MESSAGE,
+        MODEL_TIMEOUT_S,
+        WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE, WRONG_API_KEY_MESSAGE,
     },
+    models::stream::{Phase, StreamEvent},
     services::{failover, prompt},
     utils::images,
 };
@@ -68,33 +71,79 @@ impl AiClient {
 
     async fn stream_to_channel(
         &self,
-        channel: &Channel<String>,
+        channel: &Channel<StreamEvent>,
+        model: &str,
         req: CreateChatCompletionRequest,
         empty_err: &str,
     ) -> Result<String, String> {
-        let mut stream = self.client.chat().create_stream(req).await.map_err(|e| {
+        // A model that stays completely silent for this long is given up on.
+        let silence_limit = Duration::from_secs(MODEL_TIMEOUT_S);
+        let silence_err = format!("{model} sent nothing for {MODEL_TIMEOUT_S}s");
+
+        let opened = tokio::time::timeout(silence_limit, self.client.chat().create_stream(req))
+            .await
+            .map_err(|_| silence_err.clone())?;
+        let mut stream = opened.map_err(|e| {
             log::error!("LLM stream request failed: {e}");
             e.to_string()
         })?;
 
+        let started = std::time::Instant::now();
         let mut full_text = String::new();
         let mut chunks = 0usize;
+        let mut silent_pieces = 0usize;
 
-        while let Some(chunk) = stream.next().await {
+        loop {
+            // Wait for the next piece, but not forever.
+            let next = match tokio::time::timeout(silence_limit, stream.next()).await {
+                Ok(next) => next,
+                Err(_) => {
+                    log::warn!("{silence_err} (after {chunks} chunks)");
+                    // Already part-way through an answer: keep what we have.
+                    if full_text.is_empty() {
+                        return Err(silence_err);
+                    }
+                    break;
+                }
+            };
+            let Some(chunk) = next else { break }; // the stream ended normally
             let chunk = chunk.map_err(|e| {
                 log::error!("LLM stream chunk error after {chunks} chunks: {e}");
                 e.to_string()
             })?;
-            if let Some(delta) = chunk.choices.first().and_then(|c| c.delta.content.as_ref()) {
-                chunks += 1;
-                log::info!("chunk {chunks} at {:?}", std::time::Instant::now());
-                full_text.push_str(delta);
-                let _ = channel.send(delta.clone());
+            let Some(delta) = chunk.choices.first().and_then(|c| c.delta.content.as_ref()) else {
+                continue;
+            };
+
+            // Thinking models send empty pieces while they reason. Report it once.
+            if delta.is_empty() {
+                if full_text.is_empty() && silent_pieces == 0 {
+                    let _ = channel.send(StreamEvent::Status(Phase::Thinking));
+                }
+                silent_pieces += 1;
+                continue;
             }
+
+            if full_text.is_empty() {
+                log::info!(
+                    "first word after {:.1}s ({silent_pieces} silent pieces before it)",
+                    started.elapsed().as_secs_f32()
+                );
+                // The router (`openrouter/free`) tells us which model really answered.
+                let real_model = if chunk.model.is_empty() {
+                    model.to_string()
+                } else {
+                    chunk.model.clone()
+                };
+                let _ = channel.send(StreamEvent::Model(real_model));
+            }
+            chunks += 1;
+            full_text.push_str(delta);
+            let _ = channel.send(StreamEvent::Token(delta.clone()));
         }
 
         if full_text.is_empty() {
-            log::warn!("LLM returned no content ({chunks} chunks)");
+            log::warn!("LLM returned no content ({silent_pieces} silent pieces)");
             return Err(empty_err.to_string());
         }
 
@@ -110,7 +159,7 @@ impl AiClient {
     /// Sends one question (plus any images) to one model and streams the answer.
     async fn ask(
         &self,
-        channel: &Channel<String>,
+        channel: &Channel<StreamEvent>,
         model: &str,
         system_prompt: &str,
         query: &str,
@@ -137,14 +186,14 @@ impl AiClient {
             .build()
             .map_err(|e| e.to_string())?;
 
-        self.stream_to_channel(channel, req, empty_err).await
+        self.stream_to_channel(channel, model, req, empty_err).await
     }
 
     /// Tries the models in order and returns the first answer.
     /// Any error moves on to the next model, except 401: all models share one key.
     async fn ask_models(
         &self,
-        channel: &Channel<String>,
+        channel: &Channel<StreamEvent>,
         models: &[String],
         system_prompt: &str,
         query: &str,
@@ -179,7 +228,7 @@ impl AiClient {
     /// Plain chat. With images it uses the vision models, otherwise the text models.
     pub async fn call_llm(
         &self,
-        channel: &Channel<String>,
+        channel: &Channel<StreamEvent>,
         query: &str,
         context: Option<&str>,
         image_paths: &[String],
@@ -206,8 +255,9 @@ impl AiClient {
     /// Chat grounded on web sources (`blocks`), fenced as untrusted content.
     pub async fn call_llm_for_web(
         &self,
-        channel: &Channel<String>,
+        channel: &Channel<StreamEvent>,
         query: &str,
+        context: Option<&str>,
         blocks: &str,
     ) -> Result<String, String> {
         let nonce = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
@@ -216,18 +266,23 @@ impl AiClient {
 
         let today = chrono::Utc::now().format("%A, %y-%m-%d").to_string();
 
-        let prompt = WEB_PROMPT_TEMPLATE
-            .replace("{TODAY}", &today)
-            .replace("{OPEN_FENCE}", &open)
-            .replace("{CLOSE_FENCE}", &close)
-            .replace("{SOURCES}", blocks);
+        // No sources: use the prompt that says "the search found nothing".
+        let prompt = if blocks.trim().is_empty() {
+            WEB_EMPTY_PROMPT_TEMPLATE.replace("{TODAY}", &today)
+        } else {
+            WEB_PROMPT_TEMPLATE
+                .replace("{TODAY}", &today)
+                .replace("{OPEN_FENCE}", &open)
+                .replace("{CLOSE_FENCE}", &close)
+                .replace("{SOURCES}", blocks)
+        };
 
         let sys_prompt = format!("{}\n{}", DEFAULT_SYSTEM_PROMPT, prompt);
         self.ask_models(
             channel,
             &self.text_models,
             &sys_prompt,
-            query,
+            &prompt::build_message(query, context),
             &[],
             "empty text response from llm!",
         )
@@ -273,3 +328,4 @@ async fn encode_images(image_paths: &[String]) -> Result<Vec<String>, String> {
     .await
     .map_err(|e| format!("image task failed: {e}"))?
 }
+

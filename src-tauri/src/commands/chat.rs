@@ -1,5 +1,6 @@
 use tauri::ipc::Channel;
 
+use crate::models::stream::StreamEvent;
 use crate::services::llm::AiClient;
 
 /// Plain chat. Besides the question it can carry:
@@ -8,7 +9,7 @@ use crate::services::llm::AiClient;
 /// The frontend sends these as `context` and `imagePaths`.
 #[tauri::command]
 pub async fn ask_ai(
-    channel: Channel<String>,
+    channel: Channel<StreamEvent>,
     query: String,
     context: Option<String>,
     image_paths: Option<Vec<String>>,
