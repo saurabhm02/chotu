@@ -3,7 +3,7 @@
 use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use crate::services::selection;
+use crate::services::{panel, selection};
 
 fn toggle_modifier() -> Modifiers {
     if cfg!(target_os = "macos") {
@@ -49,8 +49,7 @@ pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
                         let _ = window.emit("toggle-floating-mode", ());
                     }
                 }
-                let _ = window.show();
-                let _ = window.set_focus();
+                panel::show_main_window(&app);
             });
         })
         .build()
@@ -62,4 +61,3 @@ pub fn register<R: Runtime>(app: &tauri::App<R>) -> Result<(), Box<dyn std::erro
         .register(Shortcut::new(Some(toggle_modifier()), Code::Slash))?;
     Ok(())
 }
-

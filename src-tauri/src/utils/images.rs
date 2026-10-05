@@ -8,10 +8,8 @@ use image::{codecs::jpeg::JpegEncoder, imageops::FilterType};
 const MAX_SIDE: u32 = 1920;
 const JPEG_QUALITY: u8 = 85;
 
-/// Reads an image file, shrinks it so neither side is over `MAX_SIDE`, saves it as
-/// a JPEG in memory, and returns it as a `data:` URL, which is how a chat API
-/// accepts an image inside a request.
-pub fn to_data_url(path: &Path) -> Result<String, String> {
+/// Shrinks the image so neither side exceeds `MAX_SIDE` and returns it as JPEG bytes.
+fn shrunk_jpeg(path: &Path) -> Result<Vec<u8>, String> {
     let image = image::open(path).map_err(|e| format!("could not open the image: {e}"))?;
 
     let image = if image.width() > MAX_SIDE || image.height() > MAX_SIDE {
@@ -24,8 +22,21 @@ pub fn to_data_url(path: &Path) -> Result<String, String> {
     JpegEncoder::new_with_quality(&mut jpeg, JPEG_QUALITY)
         .encode_image(&image.to_rgb8())
         .map_err(|e| format!("could not compress the image: {e}"))?;
+    Ok(jpeg)
+}
 
-    Ok(format!("data:image/jpeg;base64,{}", STANDARD.encode(&jpeg)))
+/// The shrunk image as a `data:` URL, the form chat APIs accept.
+pub fn to_data_url(path: &Path) -> Result<String, String> {
+    Ok(format!(
+        "data:image/jpeg;base64,{}",
+        STANDARD.encode(shrunk_jpeg(path)?)
+    ))
+}
+
+/// Writes the shrunk image to `destination` as a JPEG.
+pub fn save_jpeg(path: &Path, destination: &Path) -> Result<(), String> {
+    std::fs::write(destination, shrunk_jpeg(path)?)
+        .map_err(|e| format!("could not save the image: {e}"))
 }
 
 #[cfg(test)]
@@ -65,5 +76,16 @@ mod tests {
     #[test]
     fn missing_file_is_an_error() {
         assert!(to_data_url(Path::new("/no/such/file.png")).is_err());
+    }
+
+    #[test]
+    fn a_saved_copy_is_a_smaller_jpeg() {
+        let source = make_png("ty_save_source.png", 3840, 1920);
+        let destination = std::env::temp_dir().join("ty_save_copy.jpg");
+        save_jpeg(&source, &destination).unwrap();
+
+        let copy = image::open(&destination).unwrap();
+        assert_eq!((copy.width(), copy.height()), (1920, 960));
+        let _ = std::fs::remove_file(&destination);
     }
 }

@@ -1,7 +1,9 @@
+pub mod attachments;
 pub mod failover;
 pub mod history;
 pub mod llm;
 pub mod ocr;
+pub mod panel;
 pub mod prompt;
 pub mod screen;
 pub mod selection;

@@ -32,3 +32,8 @@ pub const WRONG_API_KEY_MESSAGE: &str = "The API key is incorrect.";
 
 pub const MAX_HISTORY_MESSAGES: usize = 10;
 pub const MAX_HISTORY_MESSAGE_CHARS: usize = 4000;
+
+pub const TITLE_PROMPT: &str = "Write a title of 3 to 6 words for the conversation below. \
+Reply with the title only: no quotes, no full stop, no explanation.";
+
+pub const TITLE_TIMEOUT_S: u64 = 20;

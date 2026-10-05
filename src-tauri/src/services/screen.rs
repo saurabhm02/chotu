@@ -1,5 +1,6 @@
 //! Taking screenshots. On macOS this uses the built-in `screencapture` tool and
 //! saves PNG files in the app's cache folder.
+
 #[cfg(target_os = "macos")]
 mod mac {
     use std::path::{Path, PathBuf};
@@ -8,6 +9,7 @@ mod mac {
     use tauri::{AppHandle, Manager, Runtime};
 
     use crate::models::screen::ScreenShot;
+    use crate::services::panel;
 
     #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
@@ -55,20 +57,14 @@ mod mac {
         let path = screen_dir(app)?.join(format!("{id}.png"));
 
         // Hide TY so it isn't in the picture, and always bring it back after.
-        let window = app.get_webview_window("main");
-        if let Some(window) = &window {
-            let _ = window.hide();
-        }
+        panel::hide_main_window(app);
 
         // Give macOS a moment to really remove the window from the screen.
         tokio::time::sleep(Duration::from_millis(250)).await;
 
         let finished = run_screencapture(&path, &mode).await;
 
-        if let Some(window) = &window {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        panel::show_main_window(app);
         finished?;
 
         // Pressing Esc while dragging ends `screencapture` without making a file.
@@ -154,4 +150,3 @@ pub async fn capture_region<R: tauri::Runtime>(
 ) -> Result<Option<crate::models::screen::ScreenShot>, String> {
     Err("Screen capture only works on macOS for now.".to_string())
 }
-

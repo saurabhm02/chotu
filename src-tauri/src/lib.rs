@@ -14,10 +14,14 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder.plugin(services::shortcut::plugin()).setup(|app| {
+        services::panel::init(app);
         services::shortcut::register(app)?;
         db::init(app);
         Ok(())
     });
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
 
     builder
         .plugin(tauri_plugin_opener::init())
@@ -30,6 +34,13 @@ pub fn run() {
             commands::screen::capture_region,
             commands::history::chat_create,
             commands::history::chat_add_message,
+            commands::history::chat_list,
+            commands::history::chat_messages,
+            commands::history::chat_rename,
+            commands::history::chat_delete,
+            commands::history::chat_generate_title,
+            commands::history::store_attachments,
+            commands::history::attachment_data_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

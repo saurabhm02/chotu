@@ -19,7 +19,8 @@ use tauri::ipc::Channel;
 use crate::{
     config::{
         ALL_MODELS_FAILED_MESSAGE, DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS, MODEL_TIMEOUT_S,
-        WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE, WRONG_API_KEY_MESSAGE,
+        TITLE_PROMPT, TITLE_TIMEOUT_S, WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE,
+        WRONG_API_KEY_MESSAGE,
     },
     models::chat::ChatMessage,
     models::stream::{Phase, StreamEvent},
@@ -279,7 +280,50 @@ impl AiClient {
         .await
     }
 
-    /// Chat grounded on web sources (`blocks`), fenced as untrusted content.
+    pub async fn generate_title(&self, question: &str, answer: &str) -> Result<String, String> {
+        let conversation = format!("Question:\n{question}\n\nAnswer:\n{answer}");
+
+        for model in self.text_models.iter().take(2) {
+            let messages: Vec<ChatCompletionRequestMessage> = vec![
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(TITLE_PROMPT)
+                    .build()
+                    .map_err(|e| e.to_string())?
+                    .into(),
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(conversation.clone())
+                    .build()
+                    .map_err(|e| e.to_string())?
+                    .into(),
+            ];
+            let request = CreateChatCompletionRequestArgs::default()
+                .model(model)
+                .messages(messages)
+                .build()
+                .map_err(|e| e.to_string())?;
+
+            let timeout = Duration::from_secs(TITLE_TIMEOUT_S);
+            match tokio::time::timeout(timeout, self.client.chat().create(request)).await {
+                Ok(Ok(response)) => {
+                    let title = response
+                        .choices
+                        .first()
+                        .and_then(|choice| choice.message.content.as_deref())
+                        .map(str::trim)
+                        .filter(|title| !title.is_empty());
+                    if let Some(title) = title {
+                        return Ok(title.to_string());
+                    }
+                    log::warn!("{model} returned an empty title");
+                }
+                Ok(Err(e)) => log::warn!("title request to {model} failed: {e}"),
+                Err(_) => log::warn!("title request to {model} timed out after {TITLE_TIMEOUT_S}s"),
+            }
+        }
+
+        Err("no title generated".to_string())
+    }
+
     pub async fn call_llm_for_web(
         &self,
         channel: &Channel<StreamEvent>,
@@ -294,7 +338,6 @@ impl AiClient {
 
         let today = chrono::Utc::now().format("%A, %y-%m-%d").to_string();
 
-        // No sources: use the prompt that says "the search found nothing".
         let prompt = if blocks.trim().is_empty() {
             WEB_EMPTY_PROMPT_TEMPLATE.replace("{TODAY}", &today)
         } else {
