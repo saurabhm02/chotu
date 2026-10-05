@@ -12,6 +12,8 @@ pub struct CommandResult {
     pub text: String,
     pub sources: Vec<(String, String)>,
     pub is_error: bool,
+    /// Screenshots taken for the AI (`/screen`).
+    pub screenshots: Vec<String>,
 }
 
 impl CommandResult {
@@ -20,6 +22,7 @@ impl CommandResult {
             text,
             sources: Vec::new(),
             is_error: false,
+            screenshots: Vec::new(),
         }
     }
 
@@ -28,6 +31,7 @@ impl CommandResult {
             text: format!("Error: {message}"),
             sources: Vec::new(),
             is_error: true,
+            screenshots: Vec::new(),
         }
     }
 }
@@ -121,18 +125,22 @@ where
         shot.height
     );
 
+    // `image_path` moves into the request below; the chat stores a copy of the file.
+    let screenshot = shot.image_path.clone();
     let attachments = Attachments {
         context: build_context(quote.as_deref(), None),
         image_paths: vec![shot.image_path],
         history,
     };
     on_event(StreamEvent::Status(Phase::Captured));
-    ask_ai(
+    let mut result = ask_ai(
         question_or(question, "What is on this screen?"),
         attachments,
         on_event,
     )
-    .await
+    .await;
+    result.screenshots = vec![screenshot];
+    result
 }
 /// Route a parsed slash-command (or plain text) to the right backend call.
 pub async fn run_cmd<F>(
@@ -158,6 +166,7 @@ where
                 text: res.ans,
                 sources: res.sources,
                 is_error: false,
+                screenshots: Vec::new(),
             },
             Err(e) => CommandResult::error(e),
         },
@@ -173,6 +182,9 @@ where
         Some(Commands::Screen) => ask_about_screen_image(query, quote, history, on_event).await,
         // `/new` is handled by the chat before it gets here.
         Some(Commands::New) => not_ready("Started a new chat."),
+        Some(Commands::History) | Some(Commands::Rename) => {
+            not_ready("This command is handled by the chat.")
+        }
         Some(Commands::Notes) => not_ready("Notes isn't wired up yet (coming in Phase 8)."),
     }
 }

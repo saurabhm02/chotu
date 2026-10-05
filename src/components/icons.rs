@@ -216,3 +216,46 @@ pub fn plus_icon(props: &IconProps) -> Html {
         </svg>
     }
 }
+
+#[function_component(ClockIcon)]
+pub fn clock_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="9" stroke-width="2"/>
+            <path d="M12 7v5l3 2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    }
+}
+
+#[function_component(PencilIcon)]
+pub fn pencil_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    }
+}
+
+#[function_component(TrashIcon)]
+pub fn trash_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    }
+}

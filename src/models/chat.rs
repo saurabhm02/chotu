@@ -24,6 +24,9 @@ pub struct ChatTurn {
 
     #[serde(skip)]
     pub is_error: bool,
+    /// Paths of the stored images sent with this question.
+    #[serde(skip)]
+    pub attachments: Vec<String>,
     #[serde(default = "current_time_str")]
     pub timestamp: String,
 }
@@ -44,4 +47,28 @@ pub struct NewMessage {
     pub model: Option<String>,
     pub is_error: bool,
     pub elapsed_ms: Option<u64>,
+}
+
+/// One row of the history list.
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct ChatSummary {
+    pub id: i64,
+    pub title: String,
+    /// Milliseconds since 1970 of the last message.
+    pub updated_at: i64,
+}
+
+/// A saved message.
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct StoredMessage {
+    pub role: String,
+    pub content: String,
+    pub quote: Option<String>,
+    pub sources: Vec<(String, String)>,
+    pub model: Option<String>,
+    pub is_error: bool,
+    pub elapsed_ms: Option<i64>,
+    /// Paths of the stored images.
+    pub attachments: Vec<String>,
+    pub created_at: i64,
 }

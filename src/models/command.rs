@@ -6,6 +6,8 @@ pub enum Commands {
     Analyze,
     Screen,
     New,
+    History,
+    Rename,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -46,6 +48,16 @@ pub fn all_commands() -> Vec<Command> {
             name: "new",
             description: "start a new chat",
             cmd: Commands::New,
+        },
+        Command {
+            name: "history",
+            description: "open an earlier chat",
+            cmd: Commands::History,
+        },
+        Command {
+            name: "rename",
+            description: "rename this chat",
+            cmd: Commands::Rename,
         },
     ]
 }

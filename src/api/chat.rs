@@ -85,8 +85,6 @@ where
         .ok_or_else(|| "Failed to parse response string".to_string())
 }
 
-/// `/web`. The highlighted text (if any) travels as `context`: the backend adds
-/// its start to the search words and shows all of it to the AI.
 pub async fn invoke_ask_web<F>(
     query: String,
     quote: Option<String>,

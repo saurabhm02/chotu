@@ -45,6 +45,7 @@ mod tests {
             model: String::new(),
             elapsed_ms: None,
             is_error,
+            attachments: vec![],
             timestamp: String::new(),
         }
     }
