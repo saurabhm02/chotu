@@ -2,6 +2,7 @@ use gloo_timers::callback::Timeout;
 use yew::prelude::*;
 
 use crate::api::clipboard::copy_to_clipboard;
+use crate::api::history::invoke_attachment_data_url;
 use crate::api::opener::open_url;
 use crate::hooks::use_window::refit_window;
 use crate::components::icons::{CheckIcon, CopyIcon, RegenerateIcon};
@@ -17,6 +18,48 @@ pub struct UserBubbleProps {
     pub timestamp: String,
     #[prop_or_default]
     pub quote: Option<String>,
+    /// Paths of the stored images sent with the question.
+    #[prop_or_default]
+    pub attachments: Vec<String>,
+}
+
+#[derive(Properties, PartialEq)]
+struct AttachmentImageProps {
+    path: String,
+}
+
+#[function_component(AttachmentImage)]
+fn attachment_image(props: &AttachmentImageProps) -> Html {
+    let source = use_state(|| None::<String>);
+
+    {
+        let source = source.clone();
+        use_effect_with(props.path.clone(), move |path| {
+            let path = path.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                match invoke_attachment_data_url(&path).await {
+                    Ok(url) => {
+                        source.set(Some(url));
+                        refit_window();
+                    }
+                    Err(e) => log::warn!("could not load {path}: {e}"),
+                }
+            });
+            || ()
+        });
+    }
+
+    match &*source {
+        Some(url) => html! {
+            <img
+                src={url.clone()}
+                class="mb-1 max-h-44 w-auto max-w-full rounded-lg border border-white/10 object-contain"
+            />
+        },
+        None => html! {
+            <div class="mb-1 h-16 w-28 rounded-lg border border-white/10 bg-white/[0.04]"></div>
+        },
+    }
 }
 
 #[function_component(UserBubble)]
@@ -24,6 +67,9 @@ pub fn user_bubble(props: &UserBubbleProps) -> Html {
     html! {
         <div class="flex justify-end w-full select-text">
             <div class="bg-[#1c1f26]/90 backdrop-blur-md text-neutral-100 rounded-xl border border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.3)] max-w-[80%] w-fit px-3 py-1.5 flex flex-col">
+                { for props.attachments.iter().map(|path| html! {
+                    <AttachmentImage key={path.clone()} path={path.clone()} />
+                }) }
                 if let Some(quote) = &props.quote {
                     <div class="mb-1 pl-2 border-l-2 border-red-400/70 italic text-[12px] leading-snug text-neutral-400 line-clamp-3 break-words">
                         { format!("“{quote}”") }

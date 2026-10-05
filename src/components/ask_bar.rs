@@ -3,6 +3,7 @@ use yew::prelude::*;
 use crate::components::chat_bubble::{AssistantCard, UserBubble};
 use crate::components::command_palette::CommandPalette;
 use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks, SelectionCornerMarks};
+use crate::components::history_panel::HistoryPanel;
 use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
 use crate::components::loader::LatticeLoader;
 use crate::components::sources::StatusStrip;
@@ -38,9 +39,35 @@ pub fn ask_bar() -> Html {
             input.text.clone(),
             input.commands.len(),
             selection.text.clone(),
+            chat.history_panel.clone(),
         ),
     );
     let on_clear_selection = selection.clear.reform(|_: MouseEvent| ());
+
+    // After the history list closes or opens a chat, the cursor goes back to the text box.
+    let focus_input = {
+        let input_ref = input_ref.clone();
+        move || {
+            if let Some(textarea) = input_ref.cast::<web_sys::HtmlTextAreaElement>() {
+                let _ = textarea.focus();
+            }
+        }
+    };
+    let on_history_close = {
+        let close = chat.close_panel.clone();
+        let focus_input = focus_input.clone();
+        Callback::from(move |_: ()| {
+            close.emit(());
+            focus_input();
+        })
+    };
+    let on_history_open = {
+        let open = chat.open_chat.clone();
+        Callback::from(move |id: i64| {
+            open.emit(id);
+            focus_input();
+        })
+    };
 
     if window.is_mini {
         return html! {
@@ -65,6 +92,10 @@ pub fn ask_bar() -> Html {
                 on_cmd_hover={input.on_cmd_hover}
                 on_input={input.on_input}
                 on_regenerate={chat.regenerate}
+                history_filter={chat.history_panel.clone()}
+                on_history_open={on_history_open}
+                on_history_close={on_history_close}
+                on_history_deleted={chat.forget_chat.clone()}
                 selected_text={selection.text.clone()}
                 on_clear_selection={on_clear_selection}
             />
@@ -86,6 +117,11 @@ struct AskBarViewProps {
     pub on_cmd_select: Callback<Commands>,
     pub on_cmd_hover: Callback<usize>,
     pub on_regenerate: Callback<usize>,
+    /// `Some(filter)` while the `/history` list is open.
+    pub history_filter: Option<String>,
+    pub on_history_open: Callback<i64>,
+    pub on_history_close: Callback<()>,
+    pub on_history_deleted: Callback<i64>,
     pub selected_text: Option<String>,
     pub on_clear_selection: Callback<MouseEvent>,
 }
@@ -173,6 +209,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                            <UserBubble
                                 prompt={turn.prompt.clone()}
                                 quote={turn.quote.clone()}
+                                attachments={turn.attachments.clone()}
                                 timestamp={turn.timestamp.clone()}
                             />
                             if let (true, Some(phase)) = (is_live, turn.status) {
@@ -201,6 +238,15 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     </div>
                 }
             </div>
+        }
+
+        if let Some(filter) = &props.history_filter {
+            <HistoryPanel
+                filter={filter.clone()}
+                on_open={props.on_history_open.clone()}
+                on_close={props.on_history_close.clone()}
+                on_deleted={props.on_history_deleted.clone()}
+            />
         }
 
         if !props.commands.is_empty() {
