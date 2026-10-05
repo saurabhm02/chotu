@@ -1,6 +1,8 @@
 use yew::prelude::*;
 
-use crate::components::icons::{ActivityIcon, BookTextIcon, CodeIcon, CropIcon, GlobeIcon};
+use crate::components::icons::{
+    ActivityIcon, BookTextIcon, CodeIcon, CropIcon, GlobeIcon, PlusIcon,
+};
 use crate::models::{Command, Commands};
 
 #[derive(Properties, PartialEq)]
@@ -56,6 +58,7 @@ fn command_icon(cmd: &Commands) -> Html {
         Commands::Explain => html! { <CodeIcon class="w-3.5 h-3.5" /> },
         Commands::Analyze => html! { <ActivityIcon class="w-3.5 h-3.5" /> },
         Commands::Screen => html! { <CropIcon class="w-3.5 h-3.5" /> },
+        Commands::New => html! { <PlusIcon class="w-3.5 h-3.5" /> },
     }
 }
 
