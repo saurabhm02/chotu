@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use super::tauri::{invoke, Channel};
+use crate::models::chat::HistoryMessage;
 use crate::models::stream::StreamEvent;
 
 #[derive(Clone, Default, Debug)]
@@ -10,6 +11,7 @@ pub struct Attachments {
     pub context: Option<String>,
     /// Screenshot files to show the model (`/screen`).
     pub image_paths: Vec<String>,
+    pub history: Vec<HistoryMessage>,
 }
 
 /// What we send to the backend. `camelCase` because Tauri expects names like
@@ -22,6 +24,8 @@ struct AskInput {
     context: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     image_paths: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    history: Vec<HistoryMessage>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -36,15 +40,16 @@ async fn invoke_llm<F>(
     cmd: &str,
     query: String,
     attachments: Attachments,
-    mut on_chunk: F,
+    mut on_event: F,
 ) -> Result<JsValue, String>
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
     let input = AskInput {
         query,
         context: attachments.context,
         image_paths: attachments.image_paths,
+        history: attachments.history,
     };
     let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;
 
@@ -52,8 +57,7 @@ where
     let closure =
         Closure::wrap(Box::new(
             move |payload: JsValue| match StreamEvent::from_js(&payload) {
-                Some(StreamEvent::Token(text)) => on_chunk(text),
-                Some(_) => {}
+                Some(event) => on_event(event),
                 None => log::warn!("unreadable message from the backend: {payload:?}"),
             },
         ) as Box<dyn FnMut(JsValue)>);
@@ -71,20 +75,32 @@ where
 pub async fn invoke_ask_ai<F>(
     query: String,
     attachments: Attachments,
-    on_chunk: F,
+    on_event: F,
 ) -> Result<String, String>
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
-    let res = invoke_llm("ask_ai", query, attachments, on_chunk).await?;
+    let res = invoke_llm("ask_ai", query, attachments, on_event).await?;
     res.as_string()
         .ok_or_else(|| "Failed to parse response string".to_string())
 }
 
-pub async fn invoke_ask_web<F>(query: String, on_chunk: F) -> Result<WebSearchResponse, String>
+/// `/web`. The highlighted text (if any) travels as `context`: the backend adds
+/// its start to the search words and shows all of it to the AI.
+pub async fn invoke_ask_web<F>(
+    query: String,
+    quote: Option<String>,
+    history: Vec<HistoryMessage>,
+    on_event: F,
+) -> Result<WebSearchResponse, String>
 where
-    F: FnMut(String) + 'static,
+    F: FnMut(StreamEvent) + 'static,
 {
-    let res = invoke_llm("ask_web", query, Attachments::default(), on_chunk).await?;
+    let attachments = Attachments {
+        context: quote,
+        history,
+        ..Default::default()
+    };
+    let res = invoke_llm("ask_web", query, attachments, on_event).await?;
     serde_wasm_bindgen::from_value(res).map_err(|e| e.to_string())
 }

@@ -21,10 +21,10 @@ pub async fn invoke_chat_create(msg: &str) -> Result<i64, String> {
 pub async fn invoke_chat_add_message(msg: &NewMessage) -> Result<(), String> {
     #[derive(Serialize)]
     struct Args<'a> {
-        msg: &'a NewMessage,
+        message: &'a NewMessage,
     }
 
-    let args = serde_wasm_bindgen::to_value(&Args { msg }).map_err(|e| e.to_string())?;
+    let args = serde_wasm_bindgen::to_value(&Args { message: msg }).map_err(|e| e.to_string())?;
     invoke("chat_add_message", args)
         .await
         .map(|_| ())

@@ -1,3 +1,4 @@
+use crate::models::chat::HistoryMessage;
 use crate::models::stream::{Phase, StreamEvent};
 use crate::models::Commands;
 use crate::utils::context::build_context;
@@ -7,25 +8,42 @@ use super::ocr::invoke_extract_text;
 use super::screen::invoke_capture_screen;
 
 /// (response text, sources)
-pub type CommandResult = (String, Vec<(String, String)>);
+pub struct CommandResult {
+    pub text: String,
+    pub sources: Vec<(String, String)>,
+    pub is_error: bool,
+}
 
+impl CommandResult {
+    fn ok(text: String) -> Self {
+        Self {
+            text,
+            sources: Vec::new(),
+            is_error: false,
+        }
+    }
+
+    fn error(message: String) -> Self {
+        Self {
+            text: format!("Error: {message}"),
+            sources: Vec::new(),
+            is_error: true,
+        }
+    }
+}
 /// Plain chat, with whatever the user attached to the question.
 async fn ask_ai<F>(prompt: String, attachments: Attachments, on_event: F) -> CommandResult
 where
     F: FnMut(StreamEvent) + 'static,
 {
     match invoke_ask_ai(prompt, attachments, on_event).await {
-        Ok(res) => (res, Vec::new()),
-        Err(e) => error_result(e),
+        Ok(res) => CommandResult::ok(res),
+        Err(e) => CommandResult::error(e),
     }
 }
 
-fn error_result(message: String) -> CommandResult {
-    (format!("Error: {message}"), Vec::new())
-}
-
 fn not_ready(msg: &str) -> CommandResult {
-    (msg.to_string(), Vec::new())
+    CommandResult::ok(msg.to_string())
 }
 
 /// The user's question, or `fallback` when they typed only the command.
@@ -42,6 +60,7 @@ fn question_or(question: String, fallback: &str) -> String {
 async fn ask_about_screen_text<F>(
     question: String,
     quote: Option<String>,
+    history: Vec<HistoryMessage>,
     mut on_event: F,
 ) -> CommandResult
 where
@@ -50,7 +69,7 @@ where
     on_event(StreamEvent::Status(Phase::Capturing));
     let shot = match invoke_capture_screen().await {
         Ok(shot) => shot,
-        Err(e) => return error_result(e),
+        Err(e) => return CommandResult::error(e),
     };
     log::info!(
         "screenshot {} taken ({}x{})",
@@ -62,11 +81,12 @@ where
     on_event(StreamEvent::Status(Phase::ReadingText));
     let screen_text = match invoke_extract_text(shot.image_path).await {
         Ok(text) => text,
-        Err(e) => return error_result(e),
+        Err(e) => return CommandResult::error(e),
     };
 
     let attachments = Attachments {
         context: build_context(quote.as_deref(), Some(&screen_text)),
+        history,
         ..Default::default()
     };
     on_event(StreamEvent::Status(Phase::Thinking));
@@ -83,6 +103,7 @@ where
 async fn ask_about_screen_image<F>(
     question: String,
     quote: Option<String>,
+    history: Vec<HistoryMessage>,
     mut on_event: F,
 ) -> CommandResult
 where
@@ -91,7 +112,7 @@ where
     on_event(StreamEvent::Status(Phase::Capturing));
     let shot = match invoke_capture_screen().await {
         Ok(shot) => shot,
-        Err(e) => return error_result(e),
+        Err(e) => return CommandResult::error(e),
     };
     log::info!(
         "screenshot {} taken ({}x{})",
@@ -103,6 +124,7 @@ where
     let attachments = Attachments {
         context: build_context(quote.as_deref(), None),
         image_paths: vec![shot.image_path],
+        history,
     };
     on_event(StreamEvent::Status(Phase::Captured));
     ask_ai(
@@ -112,12 +134,12 @@ where
     )
     .await
 }
-
 /// Route a parsed slash-command (or plain text) to the right backend call.
 pub async fn run_cmd<F>(
     cmd: Option<Commands>,
     query: String,
     quote: Option<String>,
+    history: Vec<HistoryMessage>,
     on_event: F,
 ) -> CommandResult
 where
@@ -125,14 +147,19 @@ where
 {
     let quote_only = Attachments {
         context: build_context(quote.as_deref(), None),
+        history: history.clone(),
         ..Default::default()
     };
 
     match cmd {
         None => ask_ai(query, quote_only, on_event).await,
-        Some(Commands::Web) => match invoke_ask_web(query, quote, on_event).await {
-            Ok(res) => (res.ans, res.sources),
-            Err(e) => error_result(e),
+        Some(Commands::Web) => match invoke_ask_web(query, quote, history, on_event).await {
+            Ok(res) => CommandResult {
+                text: res.ans,
+                sources: res.sources,
+                is_error: false,
+            },
+            Err(e) => CommandResult::error(e),
         },
         Some(Commands::Explain) => {
             ask_ai(
@@ -142,9 +169,10 @@ where
             )
             .await
         }
-        Some(Commands::Analyze) => ask_about_screen_text(query, quote, on_event).await,
-        Some(Commands::Screen) => ask_about_screen_image(query, quote, on_event).await,
+        Some(Commands::Analyze) => ask_about_screen_text(query, quote, history, on_event).await,
+        Some(Commands::Screen) => ask_about_screen_image(query, quote, history, on_event).await,
+        // `/new` is handled by the chat before it gets here.
+        Some(Commands::New) => not_ready("Started a new chat."),
         Some(Commands::Notes) => not_ready("Notes isn't wired up yet (coming in Phase 8)."),
     }
 }
-
