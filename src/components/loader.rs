@@ -15,22 +15,17 @@ pub struct LatticeLoaderProps {
     pub font_size: f64,
 }
 
-#[function_component(LatticeLoader)]
-pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
-    let elapsed_tenths = use_state(|| 0u32);
+#[derive(Properties, PartialEq)]
+pub struct LatticeIconProps {
+    #[prop_or(3.5)]
+    pub cell_size: f64,
+    #[prop_or(1.5)]
+    pub gap: f64,
+}
 
-    {
-        let elapsed_tenths = elapsed_tenths.clone();
-        use_effect_with((), move |_| {
-            // Use wall-clock time: the captured state handle is stale (always 0).
-            let started = js_sys::Date::now();
-            let handle = Interval::new(100, move || {
-                elapsed_tenths.set(((js_sys::Date::now() - started) / 100.0) as u32);
-            });
-            move || drop(handle)
-        });
-    }
-
+/// The small square of 8 dots that light up in turn. Used by every loading label.
+#[function_component(LatticeIcon)]
+pub fn lattice_icon(props: &LatticeIconProps) -> Html {
     // 3x3 orbit pattern:
     // [0, 1, 2]
     // [7, None, 3]
@@ -52,42 +47,63 @@ pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
     let d = step * scale; // 108ms
     let cycle = 8.0 * d; // 864ms
 
+    html! {
+        <div
+            class="grid grid-cols-3 shrink-0"
+            style={format!(
+                "gap: {}px; width: {}px; height: {}px;",
+                props.gap,
+                props.cell_size * 3.0 + props.gap * 2.0,
+                props.cell_size * 3.0 + props.gap * 2.0
+            )}
+        >
+            { for cells.iter().enumerate().map(|(i, &unit)| {
+                let style = match unit {
+                    Some(u) => {
+                        let delay = (u as f64) * d;
+                        format!(
+                            "width: {}px; height: {}px; background-color: #f5f5f5; border-radius: 9999px; animation: lattice-on {}ms cubic-bezier(0.77, 0, 0.175, 1) infinite; animation-delay: {}ms;",
+                            props.cell_size, props.cell_size, cycle, delay
+                        )
+                    }
+                    None => {
+                        format!(
+                            "width: {}px; height: {}px; background-color: #f5f5f5; border-radius: 9999px; opacity: 0.07;",
+                            props.cell_size, props.cell_size
+                        )
+                    }
+                };
+                html! {
+                    <span key={i} style={style}></span>
+                }
+            }) }
+        </div>
+    }
+}
+
+#[function_component(LatticeLoader)]
+pub fn lattice_loader(props: &LatticeLoaderProps) -> Html {
+    let elapsed_tenths = use_state(|| 0u32);
+
+    {
+        let elapsed_tenths = elapsed_tenths.clone();
+        use_effect_with((), move |_| {
+            // Use wall-clock time: the captured state handle is stale (always 0).
+            let started = js_sys::Date::now();
+            let handle = Interval::new(100, move || {
+                elapsed_tenths.set(((js_sys::Date::now() - started) / 100.0) as u32);
+            });
+            move || drop(handle)
+        });
+    }
+
     let tenths = *elapsed_tenths;
     let seconds = (tenths as f64) / 10.0;
     let timer_str = format!("{:.1}s", seconds);
-    // bg-[#181a20]/90
+
     html! {
         <div class="inline-flex items-center gap-2 text-white select-none px-3 py-1.5 backdrop-blur-md rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
-            <div
-                class="grid grid-cols-3 shrink-0"
-                style={format!(
-                    "gap: {}px; width: {}px; height: {}px;",
-                    props.gap,
-                    props.cell_size * 3.0 + props.gap * 2.0,
-                    props.cell_size * 3.0 + props.gap * 2.0
-                )}
-            >
-                { for cells.iter().enumerate().map(|(i, &unit)| {
-                    let style = match unit {
-                        Some(u) => {
-                            let delay = (u as f64) * d;
-                            format!(
-                                "width: {}px; height: {}px; background-color: #f5f5f5; border-radius: 9999px; animation: lattice-on {}ms cubic-bezier(0.77, 0, 0.175, 1) infinite; animation-delay: {}ms;",
-                                props.cell_size, props.cell_size, cycle, delay
-                            )
-                        }
-                        None => {
-                            format!(
-                                "width: {}px; height: {}px; background-color: #f5f5f5; border-radius: 9999px; opacity: 0.07;",
-                                props.cell_size, props.cell_size
-                            )
-                        }
-                    };
-                    html! {
-                        <span key={i} style={style}></span>
-                    }
-                }) }
-            </div>
+            <LatticeIcon cell_size={props.cell_size} gap={props.gap} />
 
             <span class="font-medium text-[11px] text-gray-300 tracking-wide">
                 {&props.label}

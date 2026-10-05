@@ -30,16 +30,16 @@ pub struct WebSearchResponse {
     pub sources: Vec<(String, String)>,
 }
 
-/// Call a backend command that streams events through a `Channel`,
-/// forwarding each event to `on_event`, and return the command's final value.
+/// Call a backend command that streams text chunks through a `Channel`,
+/// forwarding each chunk to `on_chunk`, and return the command's final value.
 async fn invoke_llm<F>(
     cmd: &str,
     query: String,
     attachments: Attachments,
-    mut on_event: F,
+    mut on_chunk: F,
 ) -> Result<JsValue, String>
 where
-    F: FnMut(StreamEvent) + 'static,
+    F: FnMut(String) + 'static,
 {
     let input = AskInput {
         query,
@@ -49,12 +49,14 @@ where
     let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;
 
     let channel = Channel::new();
-    let closure = Closure::wrap(Box::new(move |payload: JsValue| {
-        match StreamEvent::from_js(&payload) {
-            Some(event) => on_event(event),
-            None => log::warn!("unreadable message from the backend: {payload:?}"),
-        }
-    }) as Box<dyn FnMut(JsValue)>);
+    let closure =
+        Closure::wrap(Box::new(
+            move |payload: JsValue| match StreamEvent::from_js(&payload) {
+                Some(StreamEvent::Token(text)) => on_chunk(text),
+                Some(_) => {}
+                None => log::warn!("unreadable message from the backend: {payload:?}"),
+            },
+        ) as Box<dyn FnMut(JsValue)>);
     channel.set_onmessage(&closure);
 
     js_sys::Reflect::set(&args, &"channel".into(), &channel)
@@ -69,31 +71,20 @@ where
 pub async fn invoke_ask_ai<F>(
     query: String,
     attachments: Attachments,
-    on_event: F,
+    on_chunk: F,
 ) -> Result<String, String>
 where
-    F: FnMut(StreamEvent) + 'static,
+    F: FnMut(String) + 'static,
 {
-    let res = invoke_llm("ask_ai", query, attachments, on_event).await?;
+    let res = invoke_llm("ask_ai", query, attachments, on_chunk).await?;
     res.as_string()
         .ok_or_else(|| "Failed to parse response string".to_string())
 }
 
-/// `/web`. The highlighted text (if any) travels as `context`: the backend adds
-/// its start to the search words and shows all of it to the AI.
-pub async fn invoke_ask_web<F>(
-    query: String,
-    quote: Option<String>,
-    on_event: F,
-) -> Result<WebSearchResponse, String>
+pub async fn invoke_ask_web<F>(query: String, on_chunk: F) -> Result<WebSearchResponse, String>
 where
-    F: FnMut(StreamEvent) + 'static,
+    F: FnMut(String) + 'static,
 {
-    let attachments = Attachments {
-        context: quote,
-        ..Default::default()
-    };
-    let res = invoke_llm("ask_web", query, attachments, on_event).await?;
+    let res = invoke_llm("ask_web", query, Attachments::default(), on_chunk).await?;
     serde_wasm_bindgen::from_value(res).map_err(|e| e.to_string())
 }
-

@@ -1,4 +1,5 @@
 pub mod failover;
+pub mod history;
 pub mod llm;
 pub mod ocr;
 pub mod prompt;

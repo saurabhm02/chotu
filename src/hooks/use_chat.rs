@@ -26,6 +26,7 @@ enum HistoryAction {
     FinishLastTurn {
         response: String,
         sources: Vec<(String, String)>,
+        elapsed_ms: u64,
     },
 }
 
@@ -57,10 +58,15 @@ impl Reducible for History {
                     turn.model = model;
                 }
             }
-            HistoryAction::FinishLastTurn { response, sources } => {
+            HistoryAction::FinishLastTurn {
+                response,
+                sources,
+                elapsed_ms,
+            } => {
                 if let Some(turn) = turns.last_mut() {
                     turn.response = response;
                     turn.sources = sources;
+                    turn.elapsed_ms = Some(elapsed_ms);
                 }
             }
         }
@@ -130,6 +136,7 @@ async fn send_and_stream_reply(
     quote: Option<String>,
 ) {
     is_loading.set(true);
+    let started = js_sys::Date::now();
 
     // `query` is what's left after removing a leading "/command".
     let (command, query) = detect_cmd(&prompt);
@@ -141,6 +148,7 @@ async fn send_and_stream_reply(
         sources: vec![],
         status: None,
         model: String::new(),
+        elapsed_ms: None,
         timestamp: current_time_str(),
     }));
 
@@ -159,6 +167,11 @@ async fn send_and_stream_reply(
 
     let (response, sources) = run_cmd(command, query, quote, on_event).await;
 
-    history.dispatch(HistoryAction::FinishLastTurn { response, sources });
+    let elapsed_ms = (js_sys::Date::now() - started) as u64;
+    history.dispatch(HistoryAction::FinishLastTurn {
+        response,
+        sources,
+        elapsed_ms,
+    });
     is_loading.set(false);
 }

@@ -94,6 +94,40 @@ struct AskBarViewProps {
 fn ask_bar_view(props: &AskBarViewProps) -> Html {
     let is_expanded = !props.history.is_empty() || props.is_loading;
 
+    // Keep the newest message in view while the answer streams in, unless the user
+    // scrolled up to read something older.
+    let scroll_ref = use_node_ref();
+    let stuck_to_bottom = use_mut_ref(|| true);
+    let last_turn_count = use_mut_ref(|| 0usize);
+
+    let on_scroll = {
+        let scroll_ref = scroll_ref.clone();
+        let stuck_to_bottom = stuck_to_bottom.clone();
+        Callback::from(move |_: Event| {
+            if let Some(el) = scroll_ref.cast::<web_sys::Element>() {
+                let from_bottom = el.scroll_height() - el.scroll_top() - el.client_height();
+                *stuck_to_bottom.borrow_mut() = from_bottom < 40;
+            }
+        })
+    };
+
+    {
+        let scroll_ref = scroll_ref.clone();
+        use_effect_with(props.history.clone(), move |history| {
+            // A new question always scrolls down.
+            if history.len() != *last_turn_count.borrow() {
+                *last_turn_count.borrow_mut() = history.len();
+                *stuck_to_bottom.borrow_mut() = true;
+            }
+            if *stuck_to_bottom.borrow() {
+                if let Some(el) = scroll_ref.cast::<web_sys::Element>() {
+                    el.set_scroll_top(el.scroll_height());
+                }
+            }
+            || ()
+        });
+    }
+
     // Until the first chunk arrives the answer is empty, so we're still "Thinking";
     // after that, text is streaming in.
     let is_streaming = props
@@ -125,7 +159,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
         }
 
         if is_expanded {
-            <div class="relative w-full flex-1 min-h-0 max-h-[700px] overflow-y-auto px-3 pt-3 space-y-2.5 cmd-scroll">
+            <div ref={scroll_ref} onscroll={on_scroll} class="relative w-full flex-1 min-h-0 max-h-[700px] overflow-y-auto px-3 pt-3 space-y-2.5 cmd-scroll">
                 { for props.history.iter().enumerate().map(|(idx, turn)| {
                     let on_regen = {
                         let on_regenerate = props.on_regenerate.clone();
@@ -153,6 +187,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                                     response={turn.response.clone()}
                                     sources={turn.sources.clone()}
                                     model={turn.model.clone()}
+                                    elapsed_ms={turn.elapsed_ms}
                                     on_regenerate={Some(on_regen)}
                                 />
                             }

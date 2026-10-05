@@ -1,6 +1,7 @@
 use async_openai::{
     config::OpenAIConfig,
     types::chat::{
+        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
         ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
         ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
         ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart,
@@ -17,10 +18,10 @@ use tauri::ipc::Channel;
 
 use crate::{
     config::{
-        ALL_MODELS_FAILED_MESSAGE, DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS,
-        MODEL_TIMEOUT_S,
+        ALL_MODELS_FAILED_MESSAGE, DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS, MODEL_TIMEOUT_S,
         WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE, WRONG_API_KEY_MESSAGE,
     },
+    models::chat::ChatMessage,
     models::stream::{Phase, StreamEvent},
     services::{failover, prompt},
     utils::images,
@@ -75,6 +76,7 @@ impl AiClient {
         model: &str,
         req: CreateChatCompletionRequest,
         empty_err: &str,
+        silent_phase: Phase,
     ) -> Result<String, String> {
         // A model that stays completely silent for this long is given up on.
         let silence_limit = Duration::from_secs(MODEL_TIMEOUT_S);
@@ -118,7 +120,7 @@ impl AiClient {
             // Thinking models send empty pieces while they reason. Report it once.
             if delta.is_empty() {
                 if full_text.is_empty() && silent_pieces == 0 {
-                    let _ = channel.send(StreamEvent::Status(Phase::Thinking));
+                    let _ = channel.send(StreamEvent::Status(silent_phase));
                 }
                 silent_pieces += 1;
                 continue;
@@ -162,22 +164,26 @@ impl AiClient {
         channel: &Channel<StreamEvent>,
         model: &str,
         system_prompt: &str,
+        history: &[ChatMessage],
         query: &str,
         image_urls: &[String],
         empty_err: &str,
     ) -> Result<String, String> {
-        let messages = vec![
-            ChatCompletionRequestSystemMessageArgs::default()
+        let mut messages: Vec<ChatCompletionRequestMessage> =
+            vec![ChatCompletionRequestSystemMessageArgs::default()
                 .content(system_prompt)
                 .build()
                 .map_err(|e| e.to_string())?
-                .into(),
+                .into()];
+        messages.extend(history_messages(history)?);
+
+        messages.push(
             ChatCompletionRequestUserMessageArgs::default()
                 .content(user_content(query, image_urls))
                 .build()
                 .map_err(|e| e.to_string())?
                 .into(),
-        ];
+        );
 
         let req = CreateChatCompletionRequestArgs::default()
             .model(model)
@@ -186,7 +192,14 @@ impl AiClient {
             .build()
             .map_err(|e| e.to_string())?;
 
-        self.stream_to_channel(channel, model, req, empty_err).await
+        // Means - if the image is not in the input only text we show Shrinking, and if image thent it says "Analyzing screenshot".
+        let silent_phase = if image_urls.is_empty() {
+            Phase::Thinking
+        } else {
+            Phase::Analyzing
+        };
+        self.stream_to_channel(channel, model, req, empty_err, silent_phase)
+            .await
     }
 
     /// Tries the models in order and returns the first answer.
@@ -196,6 +209,7 @@ impl AiClient {
         channel: &Channel<StreamEvent>,
         models: &[String],
         system_prompt: &str,
+        history: &[ChatMessage],
         query: &str,
         image_urls: &[String],
         empty_err: &str,
@@ -208,7 +222,15 @@ impl AiClient {
             );
 
             let result = self
-                .ask(channel, model, system_prompt, query, image_urls, empty_err)
+                .ask(
+                    channel,
+                    model,
+                    system_prompt,
+                    history,
+                    query,
+                    image_urls,
+                    empty_err,
+                )
                 .await;
 
             match result {
@@ -231,6 +253,7 @@ impl AiClient {
         channel: &Channel<StreamEvent>,
         query: &str,
         context: Option<&str>,
+        history: &[ChatMessage],
         image_paths: &[String],
     ) -> Result<String, String> {
         let message = prompt::build_message(query, context);
@@ -238,13 +261,17 @@ impl AiClient {
         let (models, image_urls) = if image_paths.is_empty() {
             (&self.text_models, Vec::new())
         } else {
-            (&self.vision_models, encode_images(image_paths).await?)
+            let _ = channel.send(StreamEvent::Status(Phase::Preparing));
+            let urls = encode_images(image_paths).await?;
+            let _ = channel.send(StreamEvent::Status(Phase::Analyzing));
+            (&self.vision_models, urls)
         };
 
         self.ask_models(
             channel,
             models,
             DEFAULT_SYSTEM_PROMPT,
+            history,
             &message,
             &image_urls,
             "empty text content response",
@@ -258,6 +285,7 @@ impl AiClient {
         channel: &Channel<StreamEvent>,
         query: &str,
         context: Option<&str>,
+        history: &[ChatMessage],
         blocks: &str,
     ) -> Result<String, String> {
         let nonce = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
@@ -282,6 +310,7 @@ impl AiClient {
             channel,
             &self.text_models,
             &sys_prompt,
+            history,
             &prompt::build_message(query, context),
             &[],
             "empty text response from llm!",
@@ -329,3 +358,23 @@ async fn encode_images(image_paths: &[String]) -> Result<Vec<String>, String> {
     .map_err(|e| format!("image task failed: {e}"))?
 }
 
+fn history_messages(history: &[ChatMessage]) -> Result<Vec<ChatCompletionRequestMessage>, String> {
+    let mut messages = Vec::new();
+    for item in prompt::clean_history(history) {
+        let message: ChatCompletionRequestMessage = if item.role == "assistant" {
+            ChatCompletionRequestAssistantMessageArgs::default()
+                .content(item.content)
+                .build()
+                .map_err(|e| e.to_string())?
+                .into()
+        } else {
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(item.content)
+                .build()
+                .map_err(|e| e.to_string())?
+                .into()
+        };
+        messages.push(message);
+    }
+    Ok(messages)
+}

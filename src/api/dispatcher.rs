@@ -104,7 +104,7 @@ where
         context: build_context(quote.as_deref(), None),
         image_paths: vec![shot.image_path],
     };
-    on_event(StreamEvent::Status(Phase::Thinking));
+    on_event(StreamEvent::Status(Phase::Captured));
     ask_ai(
         question_or(question, "What is on this screen?"),
         attachments,

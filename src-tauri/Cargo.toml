@@ -37,7 +37,7 @@ uuid= { version="1", features = ["v4"] }
 chrono="0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 base64 = "0.23"
-
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 accessibility = "0.2"

@@ -1,7 +1,7 @@
-use tauri::ipc::Channel;
-
+use crate::models::chat::ChatMessage;
 use crate::models::stream::StreamEvent;
 use crate::services::llm::AiClient;
+use tauri::ipc::Channel;
 
 /// Plain chat. Besides the question it can carry:
 /// - `context`: extra text for the model to read (highlighted text, text from the screen)
@@ -13,14 +13,15 @@ pub async fn ask_ai(
     query: String,
     context: Option<String>,
     image_paths: Option<Vec<String>>,
+    history: Option<Vec<ChatMessage>>,
 ) -> Result<String, String> {
     AiClient::shared()
         .call_llm(
             &channel,
             &query,
             context.as_deref(),
+            &history.unwrap_or_default(),
             &image_paths.unwrap_or_default(),
         )
         .await
 }
-

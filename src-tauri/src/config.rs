@@ -29,3 +29,6 @@ pub const ALL_MODELS_FAILED_MESSAGE: &str =
     "The AI service is not answering right now. Please try again in a minute.";
 
 pub const WRONG_API_KEY_MESSAGE: &str = "The API key is incorrect.";
+
+pub const MAX_HISTORY_MESSAGES: usize = 10;
+pub const MAX_HISTORY_MESSAGE_CHARS: usize = 4000;

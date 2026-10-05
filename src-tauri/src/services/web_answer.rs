@@ -4,6 +4,7 @@ use tauri::ipc::Channel;
 use super::llm::AiClient;
 use super::web_search::{read_pages, search_top};
 use crate::config::SEARCH_QUOTE_CHARS;
+use crate::models::chat::ChatMessage;
 use crate::models::stream::{Phase, Source, StreamEvent};
 use crate::models::web::WebSearchResponse;
 
@@ -24,6 +25,7 @@ pub async fn answer(
     channel: &Channel<StreamEvent>,
     query: &str,
     context: Option<&str>,
+    history: &[ChatMessage],
 ) -> Result<WebSearchResponse, String> {
     let _ = channel.send(StreamEvent::Status(Phase::Searching));
     let found = search_top(&search_text(query, context), "en").await?;
@@ -50,7 +52,7 @@ pub async fn answer(
     let _ = channel.send(StreamEvent::Status(Phase::Thinking));
 
     let ans = AiClient::shared()
-        .call_llm_for_web(channel, query, context, &blocks)
+        .call_llm_for_web(channel, query, context, history, &blocks)
         .await?;
     let sources = items.into_iter().map(|i| (i.title, i.source)).collect();
 
@@ -94,7 +96,7 @@ mod tests {
 
         let channel: Channel<StreamEvent> = Channel::new(|_msg| Ok(()));
         let query = "is web3 is growing in 2026 after aug 2026 and what is growing?";
-        let response = answer(&channel, query, None)
+        let response = answer(&channel, query, None, &[])
             .await
             .expect("answer should succeed");
 
@@ -102,4 +104,3 @@ mod tests {
         println!("{:#?}", response);
     }
 }
-

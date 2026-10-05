@@ -1,6 +1,7 @@
 use yew::prelude::*;
 
 use crate::api::opener::open_url;
+use crate::components::loader::LatticeIcon;
 use crate::hooks::use_window::refit_window;
 use crate::models::stream::Phase;
 use crate::utils::domain::{avatar_color, host_of, initial_of};
@@ -90,7 +91,10 @@ pub fn status_strip(props: &StatusStripProps) -> Html {
 
     let label = match props.phase {
         Phase::Capturing => "Capturing screen".to_string(),
+        Phase::Captured => "Screenshot captured".to_string(),
         Phase::ReadingText => "Reading text".to_string(),
+        Phase::Preparing => "Preparing image".to_string(),
+        Phase::Analyzing => "Analyzing screenshot".to_string(),
         Phase::Searching => "Searching the web".to_string(),
         Phase::Reading => format!("Reading sources ({count})"),
         // Once the answer is flowing, a web answer goes back to "Reading sources".
@@ -113,7 +117,7 @@ pub fn status_strip(props: &StatusStripProps) -> Html {
                 disabled={!has_sources}
                 class="inline-flex w-fit items-center gap-2 text-neutral-400 cursor-pointer disabled:cursor-default"
             >
-                <span class="strip-dots"><i></i><i></i><i></i></span>
+                <LatticeIcon />
                 if has_sources {
                     <svg
                         class={classes!("w-2.5", "h-2.5", "transition-transform", open.then_some("rotate-90"))}

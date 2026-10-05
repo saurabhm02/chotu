@@ -222,30 +222,7 @@ textarea {
   text-underline-offset: 3px;
 }
 
-/* Status strip: three pulsing dots (one orange) and a shimmering label */
-.strip-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.strip-dots i {
-  width: 5px;
-  height: 5px;
-  border-radius: 9999px;
-  background: #f5f5f5;
-  animation: dot-pulse 1.1s ease-in-out infinite;
-}
-
-.strip-dots i:nth-child(2) {
-  background: #fb923c;
-  animation-delay: 0.18s;
-}
-
-.strip-dots i:nth-child(3) {
-  animation-delay: 0.36s;
-}
-
+/* Status strip label: shimmering text */
 .shimmer-text {
   background: linear-gradient(90deg, #737373 30%, #f5f5f5 50%, #737373 70%);
   background-size: 200% 100%;
@@ -253,11 +230,6 @@ textarea {
   background-clip: text;
   color: transparent;
   animation: shimmer 1.8s linear infinite;
-}
-
-@keyframes dot-pulse {
-  0%, 100% { opacity: 0.25; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes shimmer {

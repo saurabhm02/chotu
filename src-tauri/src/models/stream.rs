@@ -19,8 +19,10 @@ pub enum StreamEvent {
 pub enum Phase {
     /// `/ss` and `/screen`: taking the screenshot.
     Capturing,
-    /// `/ss`: reading the words on the screenshot.
+    Captured,
     ReadingText,
+    Preparing,
+    Analyzing,
     Searching,
     Reading,
     Thinking,
@@ -69,6 +71,22 @@ mod tests {
         assert_eq!(
             json(&StreamEvent::Status(Phase::Capturing)),
             r#"{"type":"Status","data":"capturing"}"#
+        );
+    }
+
+    #[test]
+    fn screenshot_steps_have_their_own_words() {
+        assert_eq!(
+            json(&StreamEvent::Status(Phase::Captured)),
+            r#"{"type":"Status","data":"captured"}"#
+        );
+        assert_eq!(
+            json(&StreamEvent::Status(Phase::Preparing)),
+            r#"{"type":"Status","data":"preparing"}"#
+        );
+        assert_eq!(
+            json(&StreamEvent::Status(Phase::Analyzing)),
+            r#"{"type":"Status","data":"analyzing"}"#
         );
     }
 

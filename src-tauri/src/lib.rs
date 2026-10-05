@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod config;
+pub mod db;
 pub mod models;
 pub mod services;
 pub mod utils;
@@ -14,6 +15,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(services::shortcut::plugin()).setup(|app| {
         services::shortcut::register(app)?;
+        db::init(app);
         Ok(())
     });
 
@@ -25,7 +27,9 @@ pub fn run() {
             commands::window::keep_window_on_screen,
             commands::ocr::extract_text,
             commands::screen::capture_screen,
-            commands::screen::capture_region
+            commands::screen::capture_region,
+            commands::history::chat_create,
+            commands::history::chat_add_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,7 @@ use crate::hooks::use_window::refit_window;
 use crate::components::icons::{CheckIcon, CopyIcon, RegenerateIcon};
 use crate::components::sources::{Avatar, SourcesList};
 use crate::utils::domain::short_model;
+use crate::utils::time::format_duration;
 use crate::utils::markdown::render_markdown_to_html;
 
 // User message
@@ -32,11 +33,57 @@ pub fn user_bubble(props: &UserBubbleProps) -> Html {
                     {&props.prompt}
                 </div>
                 <div class="flex items-center justify-end gap-1 mt-0.5 text-[10px] text-neutral-500 font-mono select-none">
+                    <CopyButton text={props.prompt.clone()} title="Copy message" icon_class="w-2.5 h-2.5" />
                     <span>{&props.timestamp}</span>
                     <CheckIcon class="w-2.5 h-2.5 text-neutral-400" />
                 </div>
             </div>
         </div>
+    }
+}
+
+// A copy icon that turns into a check mark for two seconds after it is clicked.
+#[derive(Properties, PartialEq)]
+pub struct CopyButtonProps {
+    pub text: String,
+    #[prop_or("Copy")]
+    pub title: &'static str,
+    /// Size and colour of the icon.
+    #[prop_or("w-3 h-3")]
+    pub icon_class: &'static str,
+}
+
+#[function_component(CopyButton)]
+pub fn copy_button(props: &CopyButtonProps) -> Html {
+    let copied = use_state(|| false);
+
+    let on_copy = {
+        let copied = copied.clone();
+        let text = props.text.clone();
+        Callback::from(move |e: MouseEvent| {
+            e.stop_propagation();
+            copy_to_clipboard(&text);
+            copied.set(true);
+            let copied_reset = copied.clone();
+            Timeout::new(2000, move || {
+                copied_reset.set(false);
+            })
+            .forget();
+        })
+    };
+
+    html! {
+        <button
+            onclick={on_copy}
+            title={props.title}
+            class="flex items-center px-1 py-0.5 rounded text-neutral-400 hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+        >
+            if *copied {
+                <CheckIcon class={props.icon_class} />
+            } else {
+                <CopyIcon class={props.icon_class} />
+            }
+        </button>
     }
 }
 
@@ -48,6 +95,9 @@ pub struct AssistantCardProps {
     /// The model that answered (may be empty).
     #[prop_or_default]
     pub model: String,
+    /// How long the answer took (milliseconds), once it is finished.
+    #[prop_or_default]
+    pub elapsed_ms: Option<u64>,
     #[prop_or_default]
     pub on_regenerate: Option<Callback<()>>,
 }
@@ -92,6 +142,7 @@ pub fn assistant_card(props: &AssistantCardProps) -> Html {
                     text_to_copy={props.response.clone()}
                     sources={props.sources.clone()}
                     model={props.model.clone()}
+                    elapsed_ms={props.elapsed_ms}
                     on_regenerate={props.on_regenerate.clone()}
                     on_toggle_sources={on_toggle_sources}
                 />
@@ -106,6 +157,7 @@ pub struct ActionBarProps {
     pub text_to_copy: String,
     pub sources: Vec<(String, String)>,
     pub model: String,
+    pub elapsed_ms: Option<u64>,
     #[prop_or_default]
     pub on_regenerate: Option<Callback<()>>,
     pub on_toggle_sources: Callback<()>,
@@ -113,23 +165,6 @@ pub struct ActionBarProps {
 
 #[function_component(ActionBar)]
 pub fn action_bar(props: &ActionBarProps) -> Html {
-    let copied = use_state(|| false);
-
-    let on_copy = {
-        let copied = copied.clone();
-        let text = props.text_to_copy.clone();
-        Callback::from(move |e: MouseEvent| {
-            e.stop_propagation();
-            copy_to_clipboard(&text);
-            copied.set(true);
-            let copied_reset = copied.clone();
-            Timeout::new(2000, move || {
-                copied_reset.set(false);
-            })
-            .forget();
-        })
-    };
-
     let on_regen = {
         let on_regenerate = props.on_regenerate.clone();
         Callback::from(move |e: MouseEvent| {
@@ -153,13 +188,14 @@ pub fn action_bar(props: &ActionBarProps) -> Html {
 
     html! {
         <div class="mt-2 flex items-center gap-2 text-neutral-300 select-none">
-            <button onclick={on_copy} title="Copy response" class={button}>
-                if *copied {
-                    <CheckIcon class="w-3 h-3 text-neutral-200" />
-                } else {
-                    <CopyIcon class="w-3 h-3" />
-                }
-            </button>
+            <CopyButton text={props.text_to_copy.clone()} title="Copy response" />
+
+            // Regenerate sits right next to copy.
+            if props.on_regenerate.is_some() {
+                <button onclick={on_regen} title="Regenerate response" class={button}>
+                    <RegenerateIcon class="w-3 h-3" />
+                </button>
+            }
 
             if count > 0 {
                 <button onclick={on_sources} title="Show sources" class={button}>
@@ -189,10 +225,8 @@ pub fn action_bar(props: &ActionBarProps) -> Html {
                 </span>
             }
 
-            if props.on_regenerate.is_some() {
-                <button onclick={on_regen} title="Regenerate response" class={classes!(button, "ml-auto")}>
-                    <RegenerateIcon class="w-3 h-3" />
-                </button>
+            if let Some(ms) = props.elapsed_ms {
+                <span class="font-mono text-[11px] tabular-nums text-neutral-500">{ format_duration(ms) }</span>
             }
         </div>
     }

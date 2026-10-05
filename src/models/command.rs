@@ -5,6 +5,7 @@ pub enum Commands {
     Explain,
     Analyze,
     Screen,
+    New,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -40,6 +41,11 @@ pub fn all_commands() -> Vec<Command> {
             name: "screen",
             description: "Show your screen to the AI",
             cmd: Commands::Screen,
+        },
+        Command {
+            name: "new",
+            description: "start a new chat",
+            cmd: Commands::New,
         },
     ]
 }

@@ -14,7 +14,10 @@ pub enum StreamEvent {
 #[serde(rename_all = "snake_case")]
 pub enum Phase {
     Capturing,
+    Captured,
     ReadingText,
+    Preparing,
+    Analyzing,
     Searching,
     Reading,
     Thinking,
