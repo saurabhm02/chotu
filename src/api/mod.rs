@@ -2,6 +2,7 @@ pub mod chat;
 pub mod clipboard;
 pub mod dispatcher;
 pub mod history;
+pub mod images;
 pub mod ocr;
 pub mod opener;
 pub mod screen;

@@ -124,9 +124,9 @@ mod tests {
 
     #[test]
     fn keywords_and_strings_get_classes() {
-        let html = highlight("let name = \"Ty\";", "rust");
+        let html = highlight("let name = \"Chotu\";", "rust");
         assert!(html.contains(r#"<span class="tok-keyword">let</span>"#));
-        assert!(html.contains(r#"<span class="tok-string">"Ty"</span>"#));
+        assert!(html.contains(r#"<span class="tok-string">"Chotu"</span>"#));
     }
 
     #[test]

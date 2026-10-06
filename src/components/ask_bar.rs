@@ -5,18 +5,19 @@ use crate::components::command_palette::CommandPalette;
 use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks, SelectionCornerMarks};
 use crate::components::history_panel::HistoryPanel;
 use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
+use crate::components::image_chips::ImageChips;
 use crate::components::loader::LatticeLoader;
-use crate::components::sources::StatusStrip;
 use crate::components::mini_icon::MiniIcon;
-use crate::hooks::{use_chat, use_input, use_selection, use_window};
+use crate::components::sources::StatusStrip;
+use crate::hooks::{use_chat, use_input, use_preview_attachments, use_selection, use_window};
 use crate::models::{ChatTurn, Command, Commands};
-
 /// The whole widget: wires the three hooks to the views below.
 #[function_component(AskBar)]
 pub fn ask_bar() -> Html {
     let input_ref = use_node_ref();
     let chat = use_chat();
     let selection = use_selection();
+    let attachments = use_preview_attachments();
 
     // Send the question together with the highlighted text (if any), then clear it.
     let send_with_selection = {
@@ -40,6 +41,7 @@ pub fn ask_bar() -> Html {
             input.commands.len(),
             selection.text.clone(),
             chat.history_panel.clone(),
+            attachments.paths.clone(),
         ),
     );
     let on_clear_selection = selection.clear.reform(|_: MouseEvent| ());
@@ -98,6 +100,9 @@ pub fn ask_bar() -> Html {
                 on_history_deleted={chat.forget_chat.clone()}
                 selected_text={selection.text.clone()}
                 on_clear_selection={on_clear_selection}
+                pending_attachments={attachments.paths.clone()}
+                on_paste={attachments.on_paste.clone()}
+                on_remove_attachment={attachments.remove.clone()}
             />
         </div>
     }
@@ -124,6 +129,10 @@ struct AskBarViewProps {
     pub on_history_deleted: Callback<i64>,
     pub selected_text: Option<String>,
     pub on_clear_selection: Callback<MouseEvent>,
+    /// Pasted images waiting to be sent with the next question.
+    pub pending_attachments: Vec<String>,
+    pub on_paste: Callback<Event>,
+    pub on_remove_attachment: Callback<String>,
 }
 
 #[function_component(AskBarView)]
@@ -178,7 +187,10 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
     .to_string();
 
     // `/web` turns show the status strip instead of the plain loader.
-    let last_has_status = props.history.last().is_some_and(|turn| turn.status.is_some());
+    let last_has_status = props
+        .history
+        .last()
+        .is_some_and(|turn| turn.status.is_some());
 
     html! {
       <div
@@ -283,6 +295,11 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     </div>
                 }
 
+                <ImageChips
+                    paths={props.pending_attachments.clone()}
+                    on_remove={props.on_remove_attachment.clone()}
+                />
+
                 <div class="px-2.5 py-1.5 flex items-center gap-2 justify-between">
                     <div class="flex items-center justify-center w-5 shrink-0 text-neutral-400 hover:text-white transition-colors cursor-pointer">
                         <DoubleChevronUpIcon />
@@ -295,6 +312,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                         ref={props.input_ref.clone()}
                         onkeydown={props.on_keydown.clone()}
                         oninput={props.on_input.clone()}
+                        onpaste={props.on_paste.clone()}
                         id="input"
                         rows="1"
                         placeholder="Ask anything..."
