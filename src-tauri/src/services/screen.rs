@@ -30,7 +30,7 @@ mod mac {
             return Ok(());
         }
         unsafe { CGRequestScreenCaptureAccess() };
-        Err("Screen Recording permission is needed. Allow it in System Settings → Privacy & Security → Screen & System Audio Recording, then restart TY.".to_string())
+        Err("Screen Recording permission is needed. Allow it in System Settings → Privacy & Security → Screen & System Audio Recording, then restart Chotu.".to_string())
     }
 
     /// The whole main display.
@@ -56,7 +56,7 @@ mod mac {
         let id = uuid::Uuid::new_v4().simple().to_string();
         let path = screen_dir(app)?.join(format!("{id}.png"));
 
-        // Hide TY so it isn't in the picture, and always bring it back after.
+        // Hide Chotu so it isn't in the picture, and always bring it back after.
         panel::hide_main_window(app);
 
         // Give macOS a moment to really remove the window from the screen.

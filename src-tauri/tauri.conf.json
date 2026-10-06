@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ty",
+  "productName": "Chotu",
   "version": "0.1.0",
-  "identifier": "com.saurabh.ty",
+  "identifier": "com.saurabh.chotu",
   "build": {
     "beforeDevCommand": "trunk serve",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "ty",
+        "title": "Chotu",
         "width": 450,
         "height": 40,
         "resizable": false,

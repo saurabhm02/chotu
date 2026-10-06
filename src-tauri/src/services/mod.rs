@@ -1,4 +1,5 @@
 pub mod attachments;
+pub mod clipboard_attachments;
 pub mod failover;
 pub mod history;
 pub mod llm;

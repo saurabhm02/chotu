@@ -10,7 +10,7 @@ use crate::utils::images;
 
 /// Whether `file` is inside `folder`. Both paths are resolved first, so `..` and
 /// symlinks cannot escape.
-fn is_inside(file: &Path, folder: &Path) -> bool {
+pub fn is_inside(file: &Path, folder: &Path) -> bool {
     match (file.canonicalize(), folder.canonicalize()) {
         (Ok(file), Ok(folder)) => file.starts_with(folder),
         _ => false,
@@ -66,7 +66,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(label: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ty-{label}-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("chotu-{label}-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

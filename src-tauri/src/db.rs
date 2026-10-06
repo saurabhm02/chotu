@@ -43,7 +43,7 @@ pub fn migrate(conn: &mut Connection) -> Result<(), String> {
 
     if user_version > MIGRATIONS.len() {
         return Err(format!(
-            "this database is from a newer TY (layout {user_version}, this TY knows {})",
+            "this database is from a newer Chotu (layout {user_version}, this Chotu knows {})",
             MIGRATIONS.len()
         ));
     }
@@ -92,7 +92,7 @@ fn open_app_database(app: &App) -> Result<Connection, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
-    let path = dir.join("ty.db");
+    let path = dir.join("chotu.db");
     let conn = open(&path)?;
     log::info!("database ready: {}", path.display());
     Ok(conn)
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn data_survives_closing_and_reopening_the_file() {
-        let path = std::env::temp_dir().join(format!("ty-test-{}.db", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("chotu-test-{}.db", uuid::Uuid::new_v4()));
 
         {
             let conn = open(&path).unwrap();

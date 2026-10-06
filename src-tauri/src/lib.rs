@@ -41,6 +41,8 @@ pub fn run() {
             commands::history::chat_generate_title,
             commands::history::store_attachments,
             commands::history::attachment_data_url,
+            commands::images::paste_image,
+            commands::images::preview_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
