@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "ty",
+      "name": "chotu",
       "dependencies": {
         "@tailwindcss/cli": "^4.3.3",
         "@tauri-apps/plugin-global-shortcut": "^2.4.0",

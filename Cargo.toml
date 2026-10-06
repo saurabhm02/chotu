@@ -1,5 +1,5 @@
 [package]
-name = "ty-ui"
+name = "chotu-ui"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,7 +15,12 @@ web-sys = { version = "0.3", features = [
     "Window",
     "Document",
     "Element",
-    "CssStyleDeclaration"
+    "CssStyleDeclaration",
+    "ClipboardEvent",
+    "DataTransfer",
+    "FileList",
+    "File",
+    "Blob"
 ] }
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }

@@ -1,4 +1,4 @@
-# ty — A Floating AI Overlay for macOS with Notes System
+# Chotu — A Floating AI Overlay for macOS with Notes System
 
 A lightweight, spotlight-style ambient AI overlay for macOS with a built-in notes and personal knowledge base system. Always one keystroke away (`Cmd + /`), designed to answer questions, run fast slash commands, and capture notes without breaking your focus or switching away from your active apps.
 
@@ -8,7 +8,7 @@ Built with **100% Rust** — powered by **Tauri v2** for the native macOS deskto
 
 ## 🎯 Project Goal
 
-Modern work involves constant context switching between browsers, code editors, terminals, note apps, and chat tools. `ty` eliminates that friction:
+Modern work involves constant context switching between browsers, code editors, terminals, note apps, and chat tools. `Chotu` eliminates that friction:
 - **Always One Keystroke Away**: Summon the floating overlay with `Cmd + /` from anywhere (even over fullscreen apps), ask questions, and dismiss instantly.
 - **Minimal & Distraction-Free**: A clean spotlight ask bar that expands dynamically only when answers or multi-line prompts are present.
 - **Built-in Notes & Second Brain**: Save structured insights directly into local notes and query your knowledge base later with *"What did I learn about X?"*.
@@ -80,7 +80,7 @@ We are building this project in iterative phases:
 ## 📁 Project Architecture
 
 ```text
-ty/
+chotu/
 ├── public/                               # Static assets & compiled CSS
 │   └── tailwind.css                      # Generated Tailwind v4 + DaisyUI CSS
 ├── src/                                  # Frontend (Yew WASM)
@@ -95,7 +95,7 @@ ty/
 │   └── types/                            # Domain types (ChatTurn, Commands, etc.)
 └── src-tauri/                            # Backend (Tauri v2 Native Rust)
     ├── prompts/                          # System & grounding prompts
-    │   ├── system_prompt.txt             # Core ty assistant persona
+    │   ├── system_prompt.txt             # Core Chotu assistant persona
     │   └── websearch_prompt.txt          # Web grounding & citation prompt
     ├── src/
     │   ├── main.rs                       # Tauri binary entry
