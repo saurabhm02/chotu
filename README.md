@@ -52,7 +52,7 @@ We are building this project in iterative phases:
 - [x] Multi-line auto-expanding textarea (up to 180px) with auto-scrolling.
 - [x] **LatticeLoader**: 3x3 orbit wave dot matrix loading indicator with live stopwatch timer.
 - [x] **Aura Single**: Glowing square stop-loading button state.
-- [x] Slash command autocomplete list (`/web`, `/notes`, `/analysis`).
+- [x] Slash command autocomplete list (`/web`, `/explain`, `/ss`, `/screen`, `/new`, `/history`).
 - [x] Markdown response rendering with custom code block and text styling.
 - [x] Modular architecture separating Presentation (View), State (Container), Services (Tauri Bridge), Types, and Backend Commands.
 
@@ -164,4 +164,4 @@ chotu/
 | `Enter` | Submit prompt to AI |
 | `Shift + Enter` | Insert newline in input |
 | Drag outside input/buttons | Move the floating window anywhere on screen |
-| `/` in input | Open slash command suggestions (`/web`, `/notes`, `/analysis`) |
+| `/` in input | Open slash command suggestions (`/web`, `/explain`, `/ss`, `/screen`, `/new`, `/history`) |
