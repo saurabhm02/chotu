@@ -25,7 +25,6 @@ mod tests {
             Some(TextCommand::Translate)
         );
     }
-
     #[test]
     fn an_unknown_name_gives_nothing() {
         assert_eq!(TextCommand::from_name("web"), None);
