@@ -1,0 +1,7 @@
+Write a TL;DR of the text below: its main point in 1 to 3 short, direct sentences. Keep what matters most: the main message, the key decision, or the takeaway. Leave out background, side details and qualifications.
+
+The text may end with a short instruction for the summary, such as "in Hindi" or "in one sentence". Follow it, and do not summarize the instruction itself.
+
+Reply with the summary only.
+
+Text: $INPUT

@@ -11,8 +11,9 @@ pub struct NewMessage {
     pub chat_id: i64,
     pub role: String,
     pub content: String,
+    /// The text the user had highlighted. Saved in the database column `quote`.
     #[serde(default)]
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     #[serde(default)]
     pub sources: Vec<(String, String)>,
     #[serde(default)]
@@ -37,7 +38,8 @@ pub struct ChatSummary {
 pub struct StoredMessage {
     pub role: String,
     pub content: String,
-    pub quote: Option<String>,
+    /// The text the user had highlighted. Read from the database column `quote`.
+    pub selected: Option<String>,
     pub sources: Vec<(String, String)>,
     pub model: Option<String>,
     pub is_error: bool,

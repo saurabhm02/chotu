@@ -1,4 +1,4 @@
-use crate::config::TRANSLATE_PROMPT_TEMPLATE;
+use crate::config::{TLDR_PROMPT_TEMPLATE, TRANSLATE_PROMPT_TEMPLATE};
 use crate::models::command::TextCommand;
 
 pub fn build_prompt(cmd: TextCommand, typed: &str, selected: Option<&str>) -> Option<String> {
@@ -6,6 +6,7 @@ pub fn build_prompt(cmd: TextCommand, typed: &str, selected: Option<&str>) -> Op
 
     let template = match cmd {
         TextCommand::Translate => TRANSLATE_PROMPT_TEMPLATE,
+        TextCommand::Tldr => TLDR_PROMPT_TEMPLATE,
     };
 
     Some(template.trim_end().replace("$INPUT", &input))
@@ -69,5 +70,23 @@ mod tests {
     fn a_dollar_input_inside_the_text_is_kept_as_it_is() {
         let prompt = build_prompt(TRANSLATE, "price is $INPUT", None).unwrap();
         assert!(prompt.ends_with("Text: price is $INPUT"));
+    }
+
+    #[test]
+    fn tldr_puts_the_typed_text_into_its_own_prompt() {
+        let prompt = build_prompt(TextCommand::Tldr, "a very long article", None).unwrap();
+        assert!(prompt.contains("TL;DR"));
+        assert!(prompt.ends_with("Text: a very long article"));
+    }
+
+    #[test]
+    fn tldr_summarizes_the_highlighted_text_and_follows_the_typed_instruction() {
+        let prompt = build_prompt(TextCommand::Tldr, "in hindi", Some("a long article")).unwrap();
+        assert!(prompt.ends_with("Text: a long article\n\nin hindi"));
+    }
+
+    #[test]
+    fn tldr_with_no_text_gives_nothing() {
+        assert_eq!(build_prompt(TextCommand::Tldr, "  ", None), None);
     }
 }

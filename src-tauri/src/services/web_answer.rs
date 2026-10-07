@@ -3,7 +3,7 @@ use tauri::ipc::Channel;
 
 use super::llm::AiClient;
 use super::web_search::{read_pages, search_top};
-use crate::config::SEARCH_QUOTE_CHARS;
+use crate::config::SEARCH_SELECTED_CHARS;
 use crate::models::chat::ChatMessage;
 use crate::models::stream::{Phase, Source, StreamEvent};
 use crate::models::web::WebSearchResponse;
@@ -11,14 +11,14 @@ use crate::models::web::WebSearchResponse;
 /// The words we send to the search engine: the question, then the start of the
 /// highlighted text (if any) squeezed onto one line.
 fn search_text(query: &str, context: Option<&str>) -> String {
-    let quote = context
+    let selected = context
         .unwrap_or("")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    let quote: String = quote.chars().take(SEARCH_QUOTE_CHARS).collect();
+    let selected: String = selected.chars().take(SEARCH_SELECTED_CHARS).collect();
 
-    format!("{} {}", query.trim(), quote).trim().to_string()
+    format!("{} {}", query.trim(), selected).trim().to_string()
 }
 
 pub async fn answer(
@@ -64,13 +64,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn search_is_just_the_question_without_a_quote() {
+    fn search_is_just_the_question_without_selected_text() {
         assert_eq!(search_text(" what is rust? ", None), "what is rust?");
         assert_eq!(search_text("what is rust?", Some("  \n ")), "what is rust?");
     }
 
     #[test]
-    fn quote_follows_the_question_on_one_line() {
+    fn selected_text_follows_the_question_on_one_line() {
         assert_eq!(
             search_text("is this true?", Some("beads are\n  seeds")),
             "is this true? beads are seeds"
@@ -78,14 +78,14 @@ mod tests {
     }
 
     #[test]
-    fn only_the_start_of_a_long_quote_is_used() {
+    fn only_the_start_of_long_selected_text_is_used() {
         let long = "a".repeat(500);
         let text = search_text("q", Some(&long));
-        assert_eq!(text.chars().count(), 2 + SEARCH_QUOTE_CHARS);
+        assert_eq!(text.chars().count(), 2 + SEARCH_SELECTED_CHARS);
     }
 
     #[test]
-    fn quote_alone_is_searched_when_there_is_no_question() {
+    fn selected_text_alone_is_searched_when_there_is_no_question() {
         assert_eq!(search_text("", Some("rudraksha")), "rudraksha");
     }
 

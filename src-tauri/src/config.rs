@@ -4,6 +4,7 @@ pub const DEFAULT_SYSTEM_PROMPT: &str = include_str!("../prompts/system_prompt.t
 pub const WEB_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_prompt.txt");
 pub const WEB_EMPTY_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_empty_prompt.txt");
 pub const TRANSLATE_PROMPT_TEMPLATE: &str = include_str!("../prompts/translate.txt");
+pub const TLDR_PROMPT_TEMPLATE: &str = include_str!("../prompts/tldr.txt");
 
 pub const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
      AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -14,7 +15,7 @@ pub const TIMEOUT_S: u64 = 5;
 pub const PAGE_CONTENT_CHAR: usize = 1500;
 pub const TOP_PAGE_K: usize = 5;
 /// How much of the highlighted text is added to the web search words.
-pub const SEARCH_QUOTE_CHARS: usize = 200;
+pub const SEARCH_SELECTED_CHARS: usize = 200;
 
 /// A model that sends nothing for this long is given up on (the next model is tried).
 pub const MODEL_TIMEOUT_S: u64 = 30;
