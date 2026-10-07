@@ -26,3 +26,19 @@ pub async fn preview_image(app: AppHandle, path: String) -> Result<String, Strin
         .await
         .map_err(|e| format!("image task failed: {e}"))?
 }
+
+/// The large version of an image, for viewing. Only images this app saved are allowed:
+/// pasted ones waiting to be sent, and ones already stored in a chat.
+#[tauri::command]
+pub async fn view_image(app: AppHandle, path: String) -> Result<String, String> {
+    let pasted_folder = attachments::screenshots_dir(&app)?;
+    let stored_folder = attachments::storage_dir(&app)?;
+    let path = PathBuf::from(path);
+    if !attachments::is_inside_any(&path, &[&pasted_folder, &stored_folder]) {
+        return Err("not an image added by this app".to_string());
+    }
+
+    tokio::task::spawn_blocking(move || images::to_data_url(&path))
+        .await
+        .map_err(|e| format!("image task failed: {e}"))?
+}

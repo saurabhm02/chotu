@@ -17,8 +17,14 @@ pub fn is_inside(file: &Path, folder: &Path) -> bool {
     }
 }
 
+/// Whether `file` is inside any of `folders`.
+pub fn is_inside_any(file: &Path, folders: &[&Path]) -> bool {
+    folders.iter().any(|folder| is_inside(file, folder))
+}
+
 /// Copies each screenshot into `storage_dir` as a shrunk JPEG and returns the paths of
-/// the copies. Only files inside `screenshots_dir` are accepted.
+/// the copies. A file already inside `storage_dir` is kept as it is. Any other file must
+/// be inside `screenshots_dir`.
 pub fn store_screenshots(
     storage_dir: &Path,
     screenshots_dir: &Path,
@@ -30,6 +36,10 @@ pub fn store_screenshots(
     let mut stored = Vec::new();
     for (index, screenshot) in screenshots.iter().enumerate() {
         let screenshot = Path::new(screenshot);
+        if is_inside(screenshot, storage_dir) {
+            stored.push(screenshot.to_string_lossy().into_owned());
+            continue;
+        }
         if !is_inside(screenshot, screenshots_dir) {
             return Err("not a screenshot taken by this app".to_string());
         }
@@ -103,6 +113,25 @@ mod tests {
     }
 
     #[test]
+    fn is_inside_any_accepts_a_file_in_either_folder() {
+        let first = temp_dir("first");
+        let second = temp_dir("second");
+        let in_second = write_png(&second, "b.png");
+
+        assert!(is_inside_any(Path::new(&in_second), &[&first, &second]));
+    }
+
+    #[test]
+    fn is_inside_any_rejects_a_file_in_neither_folder() {
+        let first = temp_dir("first");
+        let elsewhere = temp_dir("elsewhere");
+        let stranger = write_png(&elsewhere, "c.png");
+
+        assert!(!is_inside_any(Path::new(&stranger), &[&first]));
+        assert!(!is_inside_any(Path::new("/etc/passwd"), &[&first]));
+    }
+
+    #[test]
     fn read_data_url_returns_a_jpeg_data_url() {
         let screenshots = temp_dir("screens");
         let storage = temp_dir("storage");
@@ -130,5 +159,17 @@ mod tests {
         let escape = format!("{}/../../etc/passwd", storage.display());
 
         assert!(read_data_url(&storage, &escape).is_err());
+    }
+
+    #[test]
+    fn store_screenshots_keeps_a_file_that_is_already_stored() {
+        let screenshots = temp_dir("screens");
+        let storage = temp_dir("storage");
+        let screenshot = write_png(&screenshots, "shot.png");
+        let first = store_screenshots(&storage, &screenshots, 1, &[screenshot]).unwrap();
+
+        let again = store_screenshots(&storage, &screenshots, 2, &first).unwrap();
+
+        assert_eq!(again, first);
     }
 }

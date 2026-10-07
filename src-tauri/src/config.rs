@@ -3,6 +3,7 @@
 pub const DEFAULT_SYSTEM_PROMPT: &str = include_str!("../prompts/system_prompt.txt");
 pub const WEB_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_prompt.txt");
 pub const WEB_EMPTY_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_empty_prompt.txt");
+pub const TRANSLATE_PROMPT_TEMPLATE: &str = include_str!("../prompts/translate.txt");
 
 pub const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
      AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -29,6 +30,9 @@ pub const ALL_MODELS_FAILED_MESSAGE: &str =
     "The AI service is not answering right now. Please try again in a minute.";
 
 pub const WRONG_API_KEY_MESSAGE: &str = "The API key is incorrect.";
+
+/// Shown when a text command (like `/translate`) is sent with no text to work on.
+pub const NO_TEXT_MESSAGE: &str = "Select some text, or type it after the command.";
 
 pub const MAX_HISTORY_MESSAGES: usize = 10;
 pub const MAX_HISTORY_MESSAGE_CHARS: usize = 4000;
