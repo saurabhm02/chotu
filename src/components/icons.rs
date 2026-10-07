@@ -146,7 +146,21 @@ pub fn languages_icon(props: &IconProps) -> Html {
         </svg>
     }
 }
-
+#[function_component(AlignLeftIcon)]
+pub fn align_left_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 6H3"/>
+            <path d="M15 12H3"/>
+            <path d="M17 18H3"/>
+        </svg>
+    }
+}
 #[function_component(CodeIcon)]
 pub fn code_icon(props: &IconProps) -> Html {
     let cls = if props.class.is_empty() {

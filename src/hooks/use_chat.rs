@@ -102,7 +102,7 @@ impl Reducible for History {
 pub struct Query {
     pub text: String,
     /// Text the user had highlighted in another app.
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     /// Files for the AI to look at (pasted images).
     pub attachments: Vec<String>,
 }
@@ -185,7 +185,7 @@ pub fn use_chat() -> ChatHandle {
             if let Some(turn) = history.0.get(turn_index) {
                 send.emit(Query {
                     text: turn.prompt.clone(),
-                    quote: turn.quote.clone(),
+                    selected: turn.selected.clone(),
                     attachments: turn.attachments.clone(),
                 });
             }
@@ -257,7 +257,7 @@ async fn send_and_stream_reply(
 ) {
     let Query {
         text: prompt,
-        quote,
+        selected,
         attachments,
     } = query;
 
@@ -271,7 +271,7 @@ async fn send_and_stream_reply(
 
     history.dispatch(HistoryAction::StartTurn(ChatTurn {
         prompt: prompt.clone(), // shown exactly as typed, e.g. "/web rust news"
-        quote: quote.clone(),
+        selected: selected.clone(),
         response: String::new(),
         sources: vec![],
         status: None,
@@ -283,7 +283,7 @@ async fn send_and_stream_reply(
     }));
 
     // Saved before the answer so the question survives a crash mid-answer.
-    let saved = save_question(&chat_id, &prompt, &quote).await;
+    let saved = save_question(&chat_id, &prompt, &selected).await;
     let saved_chat = saved.as_ref().map(|s| s.chat_id);
     let question_id = saved.as_ref().and_then(|s| s.message_id);
     let chat_is_new = saved.as_ref().map(|s| s.chat_is_new).unwrap_or(false);
@@ -311,7 +311,7 @@ async fn send_and_stream_reply(
         history_for_events.dispatch(action);
     };
 
-    let result = run_cmd(command, query, quote, memory, attachments, on_event).await;
+    let result = run_cmd(command, query, selected, memory, attachments, on_event).await;
 
     let elapsed_ms = (js_sys::Date::now() - started) as u64;
 
@@ -323,7 +323,7 @@ async fn send_and_stream_reply(
             chat_id,
             role: "assistant".to_string(),
             content: result.text.clone(),
-            quote: None,
+            selected: None,
             sources: result.sources.clone(),
             model: (!model.is_empty()).then_some(model),
             is_error: result.is_error,
@@ -384,7 +384,7 @@ struct SavedQuestion {
 async fn save_question(
     chat_id: &Rc<RefCell<Option<i64>>>,
     prompt: &str,
-    quote: &Option<String>,
+    selected: &Option<String>,
 ) -> Option<SavedQuestion> {
     let existing = *chat_id.borrow();
     let (id, chat_is_new) = match existing {
@@ -405,7 +405,7 @@ async fn save_question(
         chat_id: id,
         role: "user".to_string(),
         content: prompt.to_string(),
-        quote: quote.clone(),
+        selected: selected.clone(),
         sources: vec![],
         model: None,
         is_error: false,

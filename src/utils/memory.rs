@@ -38,7 +38,7 @@ mod tests {
     fn turn(prompt: &str, response: &str, is_error: bool) -> ChatTurn {
         ChatTurn {
             prompt: prompt.to_string(),
-            quote: None,
+            selected: None,
             response: response.to_string(),
             sources: vec![],
             status: None,

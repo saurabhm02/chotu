@@ -9,7 +9,7 @@ pub struct ChatTurn {
     pub prompt: String,
     /// Text the user had highlighted, if any.
     #[serde(default)]
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     pub response: String,
     pub sources: Vec<(String, String)>,
     /// What the backend is doing right now (`/web` only). Not saved.
@@ -42,7 +42,7 @@ pub struct NewMessage {
     pub chat_id: i64,
     pub role: String,
     pub content: String,
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     pub sources: Vec<(String, String)>,
     pub model: Option<String>,
     pub is_error: bool,
@@ -63,7 +63,7 @@ pub struct ChatSummary {
 pub struct StoredMessage {
     pub role: String,
     pub content: String,
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     pub sources: Vec<(String, String)>,
     pub model: Option<String>,
     pub is_error: bool,

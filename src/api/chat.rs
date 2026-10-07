@@ -130,7 +130,7 @@ where
 
 pub async fn invoke_ask_web<F>(
     query: String,
-    quote: Option<String>,
+    selected: Option<String>,
     history: Vec<HistoryMessage>,
     on_event: F,
 ) -> Result<WebSearchResponse, String>
@@ -138,7 +138,7 @@ where
     F: FnMut(StreamEvent) + 'static,
 {
     let attachments = Attachments {
-        context: quote,
+        context: selected,
         history,
         ..Default::default()
     };

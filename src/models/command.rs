@@ -7,6 +7,7 @@ pub enum Commands {
     New,
     History,
     Translate,
+    Tldr,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -52,6 +53,11 @@ pub fn all_commands() -> Vec<Command> {
             name: "translate",
             description: "translate text to another language",
             cmd: Commands::Translate,
+        },
+        Command {
+            name: "tldr",
+            description: "summarize text in 1 to 3 sentences",
+            cmd: Commands::Tldr,
         },
     ]
 }

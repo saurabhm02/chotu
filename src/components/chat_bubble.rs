@@ -17,7 +17,7 @@ pub struct UserBubbleProps {
     pub prompt: String,
     pub timestamp: String,
     #[prop_or_default]
-    pub quote: Option<String>,
+    pub selected: Option<String>,
     /// Paths of the stored images sent with the question.
     #[prop_or_default]
     pub attachments: Vec<String>,
@@ -90,9 +90,9 @@ pub fn user_bubble(props: &UserBubbleProps) -> Html {
                         on_view={props.on_view_attachment.clone()}
                     />
                 }) }
-                if let Some(quote) = &props.quote {
+                if let Some(selected) = &props.selected {
                     <div class="mb-1 pl-2 border-l-2 border-red-400/70 italic text-[12px] leading-snug text-neutral-400 line-clamp-3 break-words">
-                        { format!("“{quote}”") }
+                        { format!("“{selected}”") }
                     </div>
                 }
                 <div class="text-[13px] leading-relaxed font-normal whitespace-pre-wrap break-words text-neutral-100">

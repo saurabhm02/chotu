@@ -59,7 +59,7 @@ fn question_or(question: String, fallback: &str) -> String {
 /// Only text reaches the model, so any text model can answer.
 async fn ask_about_screen_text<F>(
     question: String,
-    quote: Option<String>,
+    selected: Option<String>,
     history: Vec<HistoryMessage>,
     mut on_event: F,
 ) -> CommandResult
@@ -85,7 +85,7 @@ where
     };
 
     let attachments = Attachments {
-        context: build_context(quote.as_deref(), Some(&screen_text)),
+        context: build_context(selected.as_deref(), Some(&screen_text)),
         history,
         ..Default::default()
     };
@@ -102,7 +102,7 @@ where
 /// This needs a vision model (see `AI_VISION_MODEL`).
 async fn ask_about_screen_image<F>(
     question: String,
-    quote: Option<String>,
+    selected: Option<String>,
     history: Vec<HistoryMessage>,
     mut on_event: F,
 ) -> CommandResult
@@ -124,7 +124,7 @@ where
     // `image_path` moves into the request below; the chat stores a copy of the file.
     let screenshot = shot.image_path.clone();
     let attachments = Attachments {
-        context: build_context(quote.as_deref(), None),
+        context: build_context(selected.as_deref(), None),
         image_paths: vec![shot.image_path],
         history,
     };
@@ -142,7 +142,7 @@ where
 pub async fn run_cmd<F>(
     cmd: Option<Commands>,
     query: String,
-    quote: Option<String>,
+    selected: Option<String>,
     history: Vec<HistoryMessage>,
     image_paths: Vec<String>,
     on_event: F,
@@ -150,15 +150,15 @@ pub async fn run_cmd<F>(
 where
     F: FnMut(StreamEvent) + 'static,
 {
-    let quote_only = Attachments {
-        context: build_context(quote.as_deref(), None),
+    let plain_attachments = Attachments {
+        context: build_context(selected.as_deref(), None),
         image_paths,
         history: history.clone(),
     };
 
     match cmd {
-        None => ask_ai(query, quote_only, on_event).await,
-        Some(Commands::Web) => match invoke_ask_web(query, quote, history, on_event).await {
+        None => ask_ai(query, plain_attachments, on_event).await,
+        Some(Commands::Web) => match invoke_ask_web(query, selected, history, on_event).await {
             Ok(res) => CommandResult {
                 text: res.ans,
                 sources: res.sources,
@@ -170,16 +170,17 @@ where
         Some(Commands::Explain) => {
             ask_ai(
                 format!("Explain the following clearly and concisely:\n\n{query}"),
-                quote_only,
+                plain_attachments,
                 on_event,
             )
             .await
         }
-        Some(Commands::Analyze) => ask_about_screen_text(query, quote, history, on_event).await,
-        Some(Commands::Screen) => ask_about_screen_image(query, quote, history, on_event).await,
+        Some(Commands::Analyze) => ask_about_screen_text(query, selected, history, on_event).await,
+        Some(Commands::Screen) => ask_about_screen_image(query, selected, history, on_event).await,
         Some(Commands::Translate) => {
-            ask_text_command("translate", query, quote, history, on_event).await
+            ask_text_command("translate", query, selected, history, on_event).await
         }
+        Some(Commands::Tldr) => ask_text_command("tldr", query, selected, history, on_event).await,
         // `/new` and `/history` never get here: `use_chat` handles them before it calls this
         // function. They are listed only because a `match` must cover every command.
         Some(Commands::New) | Some(Commands::History) => CommandResult::ok(String::new()),

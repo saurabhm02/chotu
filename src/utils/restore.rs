@@ -15,7 +15,7 @@ pub fn turns_from_messages(
         if message.role == "user" {
             turns.push(ChatTurn {
                 prompt: message.content.clone(),
-                quote: message.quote.clone(),
+                selected: message.selected.clone(),
                 response: String::new(),
                 sources: vec![],
                 status: None,
@@ -48,7 +48,7 @@ mod tests {
         StoredMessage {
             role: role.to_string(),
             content: content.to_string(),
-            quote: None,
+            selected: None,
             sources: vec![],
             model: None,
             is_error: false,

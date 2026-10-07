@@ -50,7 +50,7 @@ pub fn ask_bar() -> Html {
             }
             send.emit(Query {
                 text,
-                quote: selected_text.clone(),
+                selected: selected_text.clone(),
                 attachments,
             });
             clear_selection.emit(());
@@ -258,7 +258,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                         <div key={idx} class="flex flex-col gap-2 w-full">
                            <UserBubble
                                 prompt={turn.prompt.clone()}
-                                quote={turn.quote.clone()}
+                                selected={turn.selected.clone()}
                                 attachments={turn.attachments.clone()}
                                 on_view_attachment={Some(props.on_view.clone())}
                                 timestamp={turn.timestamp.clone()}
