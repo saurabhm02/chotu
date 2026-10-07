@@ -23,7 +23,11 @@ pub struct InputHandle {
 /// navigation), and submitting a message. `on_submit` fires with the trimmed
 /// text whenever the user sends a message.
 #[hook]
-pub fn use_input(input_ref: NodeRef, on_submit: Callback<String>) -> InputHandle {
+pub fn use_input(
+    input_ref: NodeRef,
+    on_submit: Callback<String>,
+    can_send_empty: bool,
+) -> InputHandle {
     let text = use_state(String::new);
     let selected_index = use_state(|| 0usize);
     let palette_dismissed = use_state(|| false);
@@ -62,7 +66,7 @@ pub fn use_input(input_ref: NodeRef, on_submit: Callback<String>) -> InputHandle
                 return;
             };
             let message = textarea.value().trim().to_string();
-            if message.is_empty() {
+            if message.is_empty() && !can_send_empty {
                 return;
             }
             fill_textarea(&input_ref, "");

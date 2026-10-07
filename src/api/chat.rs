@@ -34,13 +34,23 @@ pub struct WebSearchResponse {
     pub sources: Vec<(String, String)>,
 }
 
+#[derive(Serialize, Debug)]
+struct AskCommandInput {
+    command: String,
+    typed: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    history: Vec<HistoryMessage>,
+}
+
 /// Call a backend command that streams text chunks through a `Channel`,
 /// forwarding each chunk to `on_chunk`, and return the command's final value.
 async fn invoke_llm<F>(
     cmd: &str,
     query: String,
     attachments: Attachments,
-    mut on_event: F,
+    on_event: F,
 ) -> Result<JsValue, String>
 where
     F: FnMut(StreamEvent) + 'static,
@@ -52,7 +62,17 @@ where
         history: attachments.history,
     };
     let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;
+    invoke_with_channel(cmd, args, on_event).await
+}
 
+async fn invoke_with_channel<F>(
+    cmd: &str,
+    args: JsValue,
+    mut on_event: F,
+) -> Result<JsValue, String>
+where
+    F: FnMut(StreamEvent) + 'static,
+{
     let channel = Channel::new();
     let closure =
         Closure::wrap(Box::new(
@@ -81,6 +101,29 @@ where
     F: FnMut(StreamEvent) + 'static,
 {
     let res = invoke_llm("ask_ai", query, attachments, on_event).await?;
+    res.as_string()
+        .ok_or_else(|| "Failed to parse response string".to_string())
+}
+
+pub async fn invoke_ask_command<F>(
+    command: &str,
+    typed: String,
+    selected: Option<String>,
+    history: Vec<HistoryMessage>,
+    on_event: F,
+) -> Result<String, String>
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    let input = AskCommandInput {
+        command: command.to_string(),
+        typed,
+        selected,
+        history,
+    };
+    let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;
+
+    let res = invoke_with_channel("ask_command", args, on_event).await?;
     res.as_string()
         .ok_or_else(|| "Failed to parse response string".to_string())
 }

@@ -128,8 +128,8 @@ pub fn globe_icon(props: &IconProps) -> Html {
     }
 }
 
-#[function_component(BookTextIcon)]
-pub fn book_text_icon(props: &IconProps) -> Html {
+#[function_component(LanguagesIcon)]
+pub fn languages_icon(props: &IconProps) -> Html {
     let cls = if props.class.is_empty() {
         "w-3.5 h-3.5"
     } else {
@@ -137,9 +137,12 @@ pub fn book_text_icon(props: &IconProps) -> Html {
     };
     html! {
         <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
-            <path d="M8 7h6"/>
-            <path d="M8 11h8"/>
+            <path d="m5 8 6 6"/>
+            <path d="m4 14 6-6 2-3"/>
+            <path d="M2 5h12"/>
+            <path d="M7 2h1"/>
+            <path d="m22 22-5-10-5 10"/>
+            <path d="M14 18h6"/>
         </svg>
     }
 }

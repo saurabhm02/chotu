@@ -1,37 +1,67 @@
 use yew::prelude::*;
 
+use crate::components::attachment_stack::AttachmentStack;
 use crate::components::chat_bubble::{AssistantCard, UserBubble};
 use crate::components::command_palette::CommandPalette;
 use crate::components::corner_marks::{InputCornerMarks, OuterCornerMarks, SelectionCornerMarks};
 use crate::components::history_panel::HistoryPanel;
 use crate::components::icons::{ArrowUpIcon, DoubleChevronUpIcon, ExpandCornersIcon};
-use crate::components::image_chips::ImageChips;
+use crate::components::image_viewer::ImageViewer;
 use crate::components::loader::LatticeLoader;
 use crate::components::mini_icon::MiniIcon;
 use crate::components::sources::StatusStrip;
+use crate::hooks::use_chat::Query;
 use crate::hooks::{use_chat, use_input, use_preview_attachments, use_selection, use_window};
-use crate::models::{ChatTurn, Command, Commands};
+use crate::models::{detect_cmd, ChatTurn, Command, Commands};
+use crate::utils::attachments::{attachments_to_send, extract_query_or_default};
 /// The whole widget: wires the three hooks to the views below.
 #[function_component(AskBar)]
 pub fn ask_bar() -> Html {
     let input_ref = use_node_ref();
     let chat = use_chat();
     let selection = use_selection();
-    let attachments = use_preview_attachments();
+    let preview_attachments = use_preview_attachments();
+    // The image shown large above the input, if any.
+    let viewing = use_state(|| None::<String>);
+    let on_view = {
+        let viewing = viewing.clone();
+        Callback::from(move |path: String| viewing.set(Some(path)))
+    };
+    let on_view_close = {
+        let viewing = viewing.clone();
+        Callback::from(move |_: ()| viewing.set(None))
+    };
 
-    // Send the question together with the highlighted text (if any), then clear it.
-    let send_with_selection = {
+    // Send the question with the highlighted text and pasted attachments (if any), then clear them.
+    let send_query = {
         let send = chat.send.clone();
         let selected_text = selection.text.clone();
         let clear_selection = selection.clear.clone();
+        let pasted = preview_attachments.paths.clone();
+        let clear_pasted = preview_attachments.clear.clone();
 
-        Callback::from(move |question: String| {
-            send.emit((question, selected_text.clone()));
+        Callback::from(move |text: String| {
+            let (command, _) = detect_cmd(&text);
+            let attachments = attachments_to_send(command, &pasted);
+            let text = extract_query_or_default(&text, !attachments.is_empty());
+
+            if !attachments.is_empty() {
+                clear_pasted.emit(());
+            }
+            send.emit(Query {
+                text,
+                quote: selected_text.clone(),
+                attachments,
+            });
             clear_selection.emit(());
         })
     };
 
-    let input = use_input(input_ref.clone(), send_with_selection);
+    let input = use_input(
+        input_ref.clone(),
+        send_query,
+        !preview_attachments.paths.is_empty(),
+    );
     let window = use_window(
         input_ref.clone(),
         (
@@ -41,7 +71,8 @@ pub fn ask_bar() -> Html {
             input.commands.len(),
             selection.text.clone(),
             chat.history_panel.clone(),
-            attachments.paths.clone(),
+            preview_attachments.paths.clone(),
+            (*viewing).clone(),
         ),
     );
     let on_clear_selection = selection.clear.reform(|_: MouseEvent| ());
@@ -100,9 +131,12 @@ pub fn ask_bar() -> Html {
                 on_history_deleted={chat.forget_chat.clone()}
                 selected_text={selection.text.clone()}
                 on_clear_selection={on_clear_selection}
-                pending_attachments={attachments.paths.clone()}
-                on_paste={attachments.on_paste.clone()}
-                on_remove_attachment={attachments.remove.clone()}
+                pending_attachments={preview_attachments.paths.clone()}
+                on_paste={preview_attachments.on_paste.clone()}
+                on_remove_attachment={preview_attachments.remove.clone()}
+                viewing={(*viewing).clone()}
+                on_view={on_view}
+                on_view_close={on_view_close}
             />
         </div>
     }
@@ -133,6 +167,10 @@ struct AskBarViewProps {
     pub pending_attachments: Vec<String>,
     pub on_paste: Callback<Event>,
     pub on_remove_attachment: Callback<String>,
+    /// The image shown large above the input.
+    pub viewing: Option<String>,
+    pub on_view: Callback<String>,
+    pub on_view_close: Callback<()>,
 }
 
 #[function_component(AskBarView)]
@@ -222,6 +260,7 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                                 prompt={turn.prompt.clone()}
                                 quote={turn.quote.clone()}
                                 attachments={turn.attachments.clone()}
+                                on_view_attachment={Some(props.on_view.clone())}
                                 timestamp={turn.timestamp.clone()}
                             />
                             if let (true, Some(phase)) = (is_live, turn.status) {
@@ -261,6 +300,10 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
             />
         }
 
+        if let Some(path) = &props.viewing {
+            <ImageViewer path={path.clone()} on_close={props.on_view_close.clone()} />
+        }
+
         if !props.commands.is_empty() {
             <CommandPalette
                 commands={props.commands.clone()}
@@ -295,11 +338,6 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     </div>
                 }
 
-                <ImageChips
-                    paths={props.pending_attachments.clone()}
-                    on_remove={props.on_remove_attachment.clone()}
-                />
-
                 <div class="px-2.5 py-1.5 flex items-center gap-2 justify-between">
                     <div class="flex items-center justify-center w-5 shrink-0 text-neutral-400 hover:text-white transition-colors cursor-pointer">
                         <DoubleChevronUpIcon />
@@ -322,7 +360,15 @@ fn ask_bar_view(props: &AskBarViewProps) -> Html {
                     </div>
 
                     <div class="flex items-center gap-2 shrink-0 self-center">
-                        <ExpandCornersIcon />
+                        if props.pending_attachments.is_empty() {
+                            <ExpandCornersIcon />
+                        } else {
+                            <AttachmentStack
+                                paths={props.pending_attachments.clone()}
+                                on_remove={props.on_remove_attachment.clone()}
+                                on_view={props.on_view.clone()}
+                            />
+                        }
 
                         if props.is_loading {
                             <div class="aura text-white rounded p-[1px] flex items-center justify-center">

@@ -1,3 +1,4 @@
+pub mod attachments;
 pub mod context;
 pub mod domain;
 pub mod highlight;

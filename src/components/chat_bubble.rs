@@ -21,11 +21,15 @@ pub struct UserBubbleProps {
     /// Paths of the stored images sent with the question.
     #[prop_or_default]
     pub attachments: Vec<String>,
+    /// Called with an image path when the user clicks one of the images.
+    #[prop_or_default]
+    pub on_view_attachment: Option<Callback<String>>,
 }
 
 #[derive(Properties, PartialEq)]
 struct AttachmentImageProps {
     path: String,
+    on_view: Option<Callback<String>>,
 }
 
 #[function_component(AttachmentImage)]
@@ -49,11 +53,23 @@ fn attachment_image(props: &AttachmentImageProps) -> Html {
         });
     }
 
+    let view = {
+        let path = props.path.clone();
+        let on_view = props.on_view.clone();
+        Callback::from(move |_: MouseEvent| {
+            if let Some(on_view) = &on_view {
+                on_view.emit(path.clone());
+            }
+        })
+    };
+
     match &*source {
         Some(url) => html! {
             <img
                 src={url.clone()}
-                class="mb-1 max-h-44 w-auto max-w-full rounded-lg border border-white/10 object-contain"
+                onclick={view}
+                title="Click to view"
+                class="mb-1 max-h-44 w-auto max-w-full cursor-pointer rounded-lg border border-white/10 object-contain"
             />
         },
         None => html! {
@@ -68,7 +84,11 @@ pub fn user_bubble(props: &UserBubbleProps) -> Html {
         <div class="flex justify-end w-full select-text">
             <div class="bg-[#1c1f26]/90 backdrop-blur-md text-neutral-100 rounded-xl border border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.3)] max-w-[80%] w-fit px-3 py-1.5 flex flex-col">
                 { for props.attachments.iter().map(|path| html! {
-                    <AttachmentImage key={path.clone()} path={path.clone()} />
+                    <AttachmentImage
+                        key={path.clone()}
+                        path={path.clone()}
+                        on_view={props.on_view_attachment.clone()}
+                    />
                 }) }
                 if let Some(quote) = &props.quote {
                     <div class="mb-1 pl-2 border-l-2 border-red-400/70 italic text-[12px] leading-snug text-neutral-400 line-clamp-3 break-words">

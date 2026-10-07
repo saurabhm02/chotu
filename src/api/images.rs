@@ -31,3 +31,18 @@ pub async fn invoke_preview(path: &str) -> Result<String, String> {
         .as_string()
         .ok_or_else(|| "the preview was not text".to_string())
 }
+
+/// The large version of an image, as a `data:` URL for an `<img>`.
+pub async fn invoke_view(path: &str) -> Result<String, String> {
+    let args = js_sys::Object::new();
+    js_sys::Reflect::set(&args, &"path".into(), &path.into())
+        .map_err(|_| "failed to build the arguments".to_string())?;
+
+    let image = invoke("view_image", args.into())
+        .await
+        .map_err(error_text)?;
+
+    image
+        .as_string()
+        .ok_or_else(|| "the image was not text".to_string())
+}

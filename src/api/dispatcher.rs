@@ -3,7 +3,7 @@ use crate::models::stream::{Phase, StreamEvent};
 use crate::models::Commands;
 use crate::utils::context::build_context;
 
-use super::chat::{invoke_ask_ai, invoke_ask_web, Attachments};
+use super::chat::{invoke_ask_ai, invoke_ask_command, invoke_ask_web, Attachments};
 use super::ocr::invoke_extract_text;
 use super::screen::invoke_capture_screen;
 
@@ -44,10 +44,6 @@ where
         Ok(res) => CommandResult::ok(res),
         Err(e) => CommandResult::error(e),
     }
-}
-
-fn not_ready(msg: &str) -> CommandResult {
-    CommandResult::ok(msg.to_string())
 }
 
 /// The user's question, or `fallback` when they typed only the command.
@@ -148,6 +144,7 @@ pub async fn run_cmd<F>(
     query: String,
     quote: Option<String>,
     history: Vec<HistoryMessage>,
+    image_paths: Vec<String>,
     on_event: F,
 ) -> CommandResult
 where
@@ -155,8 +152,8 @@ where
 {
     let quote_only = Attachments {
         context: build_context(quote.as_deref(), None),
+        image_paths,
         history: history.clone(),
-        ..Default::default()
     };
 
     match cmd {
@@ -180,11 +177,27 @@ where
         }
         Some(Commands::Analyze) => ask_about_screen_text(query, quote, history, on_event).await,
         Some(Commands::Screen) => ask_about_screen_image(query, quote, history, on_event).await,
-        // `/new` is handled by the chat before it gets here.
-        Some(Commands::New) => not_ready("Started a new chat."),
-        Some(Commands::History) | Some(Commands::Rename) => {
-            not_ready("This command is handled by the chat.")
+        Some(Commands::Translate) => {
+            ask_text_command("translate", query, quote, history, on_event).await
         }
-        Some(Commands::Notes) => not_ready("Notes isn't wired up yet (coming in Phase 8)."),
+        // `/new` and `/history` never get here: `use_chat` handles them before it calls this
+        // function. They are listed only because a `match` must cover every command.
+        Some(Commands::New) | Some(Commands::History) => CommandResult::ok(String::new()),
+    }
+}
+
+async fn ask_text_command<F>(
+    command: &str,
+    typed: String,
+    selected: Option<String>,
+    history: Vec<HistoryMessage>,
+    on_event: F,
+) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    match invoke_ask_command(command, typed, selected, history, on_event).await {
+        Ok(text) => CommandResult::ok(text),
+        Err(e) => CommandResult::error(e),
     }
 }

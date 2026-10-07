@@ -1,13 +1,12 @@
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Commands {
     Web,
-    Notes,
     Explain,
     Analyze,
     Screen,
     New,
     History,
-    Rename,
+    Translate,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -23,11 +22,6 @@ pub fn all_commands() -> Vec<Command> {
             name: "web",
             description: "Search the web",
             cmd: Commands::Web,
-        },
-        Command {
-            name: "notes",
-            description: "Save or search notes",
-            cmd: Commands::Notes,
         },
         Command {
             name: "explain",
@@ -55,9 +49,9 @@ pub fn all_commands() -> Vec<Command> {
             cmd: Commands::History,
         },
         Command {
-            name: "rename",
-            description: "rename this chat",
-            cmd: Commands::Rename,
+            name: "translate",
+            description: "translate text to another language",
+            cmd: Commands::Translate,
         },
     ]
 }

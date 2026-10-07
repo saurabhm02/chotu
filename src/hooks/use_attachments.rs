@@ -12,6 +12,7 @@ struct PreviewAttachments(Vec<String>);
 enum PreviewAttachmentAction {
     Add(String),
     Remove(String),
+    Clear,
 }
 
 impl Reducible for PreviewAttachments {
@@ -27,6 +28,7 @@ impl Reducible for PreviewAttachments {
                 }
             }
             PreviewAttachmentAction::Remove(path) => paths.retain(|existing| existing != &path),
+            PreviewAttachmentAction::Clear => paths.clear(),
         }
         Rc::new(PreviewAttachments(paths))
     }
@@ -36,6 +38,7 @@ pub struct PreviewAttachmentsHandle {
     pub paths: Vec<String>,
     pub on_paste: Callback<Event>,
     pub remove: Callback<String>,
+    pub clear: Callback<()>,
 }
 
 #[hook]
@@ -73,11 +76,16 @@ pub fn use_preview_attachments() -> PreviewAttachmentsHandle {
             attachments.dispatch(PreviewAttachmentAction::Remove(path))
         })
     };
+    let clear = {
+        let attachments = attachments.clone();
+        Callback::from(move |_: ()| attachments.dispatch(PreviewAttachmentAction::Clear))
+    };
 
     PreviewAttachmentsHandle {
         paths: attachments.0.clone(),
         on_paste,
         remove,
+        clear,
     }
 }
 
@@ -148,5 +156,11 @@ mod tests {
             PreviewAttachmentAction::Remove("zzz".into()),
         );
         assert_eq!(state.0, ["a"]);
+    }
+
+    #[test]
+    fn clear_empties_the_list() {
+        let state = apply(with_paths(&["a", "b"]), PreviewAttachmentAction::Clear);
+        assert!(state.0.is_empty());
     }
 }

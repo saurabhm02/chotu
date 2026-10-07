@@ -6,7 +6,7 @@ use yew::prelude::*;
 use crate::api::dispatcher::run_cmd;
 use crate::api::history::{
     invoke_chat_add_message, invoke_chat_create, invoke_chat_generate_title, invoke_chat_messages,
-    invoke_chat_rename, invoke_store_attachments,
+    invoke_store_attachments,
 };
 use crate::models::chat::NewMessage;
 use crate::models::stream::{Phase, StreamEvent};
@@ -98,12 +98,20 @@ impl Reducible for History {
     }
 }
 
+/// A question on its way to the AI, with everything that goes with it.
+pub struct Query {
+    pub text: String,
+    /// Text the user had highlighted in another app.
+    pub quote: Option<String>,
+    /// Files for the AI to look at (pasted images).
+    pub attachments: Vec<String>,
+}
+
 pub struct ChatHandle {
     pub history: Vec<ChatTurn>,
     pub is_loading: bool,
-    /// Send (what the user typed, text they had highlighted in another app).
-    /// Streams the reply into `history`.
-    pub send: Callback<(String, Option<String>)>,
+    /// Streams the reply to a query into `history`.
+    pub send: Callback<Query>,
     /// Re-send the prompt already sitting at this position in `history`.
     pub regenerate: Callback<usize>,
     /// `Some(filter)` while the history list is open.
@@ -130,8 +138,8 @@ pub fn use_chat() -> ChatHandle {
         let chat_id = chat_id.clone();
         let panel = panel.clone();
 
-        Callback::from(move |(raw_text, quote): (String, Option<String>)| {
-            let prompt = raw_text.trim().to_string();
+        Callback::from(move |query: Query| {
+            let prompt = query.text.trim().to_string();
             if prompt.is_empty() {
                 return;
             }
@@ -151,19 +159,6 @@ pub fn use_chat() -> ChatHandle {
                     panel.set(Some(rest));
                     return;
                 }
-                Some(Commands::Rename) => {
-                    let current = *chat_id.borrow();
-                    let panel = panel.clone();
-                    wasm_bindgen_futures::spawn_local(async move {
-                        if let (Some(id), false) = (current, rest.trim().is_empty()) {
-                            if let Err(e) = invoke_chat_rename(id, &rest).await {
-                                log::warn!("could not rename the chat: {e}");
-                            }
-                        }
-                        panel.set(Some(String::new()));
-                    });
-                    return;
-                }
                 _ => {}
             }
 
@@ -172,8 +167,13 @@ pub fn use_chat() -> ChatHandle {
             let history = history.clone();
             let is_loading = is_loading.clone();
             let chat_id = chat_id.clone();
+
+            let query = Query {
+                text: prompt,
+                ..query
+            };
             wasm_bindgen_futures::spawn_local(send_and_stream_reply(
-                history, is_loading, chat_id, prompt, quote,
+                history, is_loading, chat_id, query,
             ));
         })
     };
@@ -183,7 +183,11 @@ pub fn use_chat() -> ChatHandle {
         let history = history.clone();
         Callback::from(move |turn_index: usize| {
             if let Some(turn) = history.0.get(turn_index) {
-                send.emit((turn.prompt.clone(), turn.quote.clone()));
+                send.emit(Query {
+                    text: turn.prompt.clone(),
+                    quote: turn.quote.clone(),
+                    attachments: turn.attachments.clone(),
+                });
             }
         })
     };
@@ -249,9 +253,14 @@ async fn send_and_stream_reply(
     history: UseReducerHandle<History>,
     is_loading: UseStateHandle<bool>,
     chat_id: Rc<RefCell<Option<i64>>>,
-    prompt: String,
-    quote: Option<String>,
+    query: Query,
 ) {
+    let Query {
+        text: prompt,
+        quote,
+        attachments,
+    } = query;
+
     is_loading.set(true);
     let started = js_sys::Date::now();
 
@@ -279,6 +288,9 @@ async fn send_and_stream_reply(
     let question_id = saved.as_ref().and_then(|s| s.message_id);
     let chat_is_new = saved.as_ref().map(|s| s.chat_is_new).unwrap_or(false);
 
+    // Copied into the chat now, so the question shows its attachments straight away.
+    store_attachments(&history, question_id, &attachments).await;
+
     // The event callback learns the model name first; the save after the answer needs it.
     let model_name = Rc::new(RefCell::new(String::new()));
 
@@ -299,16 +311,11 @@ async fn send_and_stream_reply(
         history_for_events.dispatch(action);
     };
 
-    let result = run_cmd(command, query, quote, memory, on_event).await;
+    let result = run_cmd(command, query, quote, memory, attachments, on_event).await;
 
     let elapsed_ms = (js_sys::Date::now() - started) as u64;
 
-    if let (Some(message_id), false) = (question_id, result.screenshots.is_empty()) {
-        match invoke_store_attachments(message_id, &result.screenshots).await {
-            Ok(paths) => history.dispatch(HistoryAction::SetAttachments(paths)),
-            Err(e) => log::warn!("could not store the screenshot: {e}"),
-        }
-    }
+    store_attachments(&history, question_id, &result.screenshots).await;
 
     if let Some(chat_id) = saved_chat {
         let model = model_name.borrow().clone();
@@ -344,6 +351,25 @@ async fn send_and_stream_reply(
         is_error: result.is_error,
     });
     is_loading.set(false);
+}
+
+/// Copies the files into the chat's storage and shows the copies on the question.
+async fn store_attachments(
+    history: &UseReducerHandle<History>,
+    message_id: Option<i64>,
+    paths: &[String],
+) {
+    let Some(message_id) = message_id else {
+        return;
+    };
+    if paths.is_empty() {
+        return;
+    }
+
+    match invoke_store_attachments(message_id, paths).await {
+        Ok(stored) => history.dispatch(HistoryAction::SetAttachments(stored)),
+        Err(e) => log::warn!("could not store the attachments: {e}"),
+    }
 }
 
 struct SavedQuestion {
