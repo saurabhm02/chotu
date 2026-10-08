@@ -8,6 +8,31 @@ pub enum Commands {
     History,
     Translate,
     Tldr,
+    Bullets,
+    Refine,
+    Rewrite,
+    Extract,
+}
+
+impl Commands {
+    /// The word typed after the slash, e.g. `Commands::Tldr` -> "tldr".
+    /// The backend uses it to find the matching prompt.
+    pub fn name(self) -> &'static str {
+        match self {
+            Commands::Web => "web",
+            Commands::Explain => "explain",
+            Commands::Analyze => "ss",
+            Commands::Screen => "screen",
+            Commands::New => "new",
+            Commands::History => "history",
+            Commands::Translate => "translate",
+            Commands::Tldr => "tldr",
+            Commands::Bullets => "bullets",
+            Commands::Refine => "refine",
+            Commands::Rewrite => "rewrite",
+            Commands::Extract => "extract",
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -21,43 +46,63 @@ pub fn all_commands() -> Vec<Command> {
     vec![
         Command {
             name: "web",
-            description: "Search the web",
+            description: "Search the web and cite the sources",
             cmd: Commands::Web,
         },
         Command {
             name: "explain",
-            description: "Explain code or text",
+            description: "Explain an idea or code in plain words, with an example",
             cmd: Commands::Explain,
         },
         Command {
             name: "ss",
-            description: "Read text from your screen",
+            description: "Read the text on your screen, then ask about it",
             cmd: Commands::Analyze,
         },
         Command {
             name: "screen",
-            description: "Show your screen to the AI",
+            description: "Capture your screen and show it to the AI",
             cmd: Commands::Screen,
         },
         Command {
             name: "new",
-            description: "start a new chat",
+            description: "Start a new chat",
             cmd: Commands::New,
         },
         Command {
             name: "history",
-            description: "open an earlier chat",
+            description: "Open an earlier chat",
             cmd: Commands::History,
         },
         Command {
             name: "translate",
-            description: "translate text to another language",
+            description: "Translate text into another language",
             cmd: Commands::Translate,
         },
         Command {
             name: "tldr",
-            description: "summarize text in 1 to 3 sentences",
+            description: "Sum up text in 1-3 short sentences",
             cmd: Commands::Tldr,
+        },
+        Command {
+            name: "bullets",
+            description: "Pull out the key points as a bullet list",
+            cmd: Commands::Bullets,
+        },
+        Command {
+            name: "refine",
+            description: "Correct grammar, spelling, and punctuation",
+            cmd: Commands::Refine,
+        },
+        Command {
+            name: "rewrite",
+            description: "Make text sound natural and casual",
+            cmd: Commands::Rewrite,
+        },
+        Command {
+            name: "extract",
+            description: "Read all the text in an image or screenshot",
+            cmd: Commands::Extract,
         },
     ]
 }
@@ -75,4 +120,30 @@ pub fn detect_cmd(text: &str) -> (Option<Commands>, String) {
         return (Some(Commands::Analyze), rest.trim().to_string());
     }
     (None, trimmed.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_command_name_matches_the_palette_entry() {
+        for command in all_commands() {
+            assert_eq!(command.cmd.name(), command.name);
+        }
+    }
+
+    #[test]
+    fn a_message_without_a_command_has_none() {
+        let (cmd, rest) = detect_cmd("  just a question ");
+        assert_eq!(cmd, None);
+        assert_eq!(rest, "just a question");
+    }
+
+    #[test]
+    fn typing_a_command_finds_it_and_keeps_the_rest() {
+        let (cmd, rest) = detect_cmd("/translate hindi good morning");
+        assert_eq!(cmd, Some(Commands::Translate));
+        assert_eq!(rest, "hindi good morning");
+    }
 }

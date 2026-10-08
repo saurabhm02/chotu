@@ -85,9 +85,8 @@ where
     };
 
     let attachments = Attachments {
-        context: build_context(selected.as_deref(), Some(&screen_text)),
+        context: build_context(selected.as_deref(), None),
         history,
-        ..Default::default()
     };
     on_event(StreamEvent::Status(Phase::Thinking));
     ask_ai(
@@ -157,7 +156,14 @@ where
     };
 
     match cmd {
-        None => ask_ai(query, plain_attachments, on_event).await,
+        None => {
+            let attachments = Attachments {
+                context: build_context(selected.as_deref(), None),
+                image_paths,
+                history,
+            };
+            ask_ai(query, attachments, on_event).await
+        }
         Some(Commands::Web) => match invoke_ask_web(query, selected, history, on_event).await {
             Ok(res) => CommandResult {
                 text: res.ans,
@@ -167,10 +173,20 @@ where
             },
             Err(e) => CommandResult::error(e),
         },
-        Some(Commands::Explain) => {
-            ask_ai(
-                format!("Explain the following clearly and concisely:\n\n{query}"),
-                plain_attachments,
+        Some(
+            command @ (Commands::Explain
+            | Commands::Translate
+            | Commands::Tldr
+            | Commands::Bullets
+            | Commands::Refine
+            | Commands::Rewrite),
+        ) => {
+            ask_text_command(
+                command.name(),
+                query,
+                selected,
+                image_paths,
+                history,
                 on_event,
             )
             .await
@@ -184,6 +200,7 @@ where
         // `/new` and `/history` never get here: `use_chat` handles them before it calls this
         // function. They are listed only because a `match` must cover every command.
         Some(Commands::New) | Some(Commands::History) => CommandResult::ok(String::new()),
+        Some(Commands::Extract) => extract_text_command(image_paths, on_event).await,
     }
 }
 
@@ -191,14 +208,40 @@ async fn ask_text_command<F>(
     command: &str,
     typed: String,
     selected: Option<String>,
+    image_paths: Vec<String>,
     history: Vec<HistoryMessage>,
     on_event: F,
 ) -> CommandResult
 where
     F: FnMut(StreamEvent) + 'static,
 {
-    match invoke_ask_command(command, typed, selected, history, on_event).await {
+    match invoke_ask_command(command, typed, selected, image_paths, history, on_event).await {
         Ok(text) => CommandResult::ok(text),
         Err(e) => CommandResult::error(e),
     }
+}
+
+async fn extract_text_command<F>(image_paths: Vec<String>, mut on_event: F) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    let paths = if image_paths.is_empty() {
+        on_event(StreamEvent::Status(Phase::Capturing));
+        match invoke_capture_screen().await {
+            Ok(shot) => vec![shot.image_path],
+            Err(e) => return CommandResult::error(e),
+        }
+    } else {
+        image_paths
+    };
+
+    on_event(StreamEvent::Status(Phase::ReadingText));
+    let mut texts = Vec::new();
+    for path in paths {
+        match invoke_extract_text(path).await {
+            Ok(text) => texts.push(text),
+            Err(e) => log::warn!("could not read the text in an image: {e}"),
+        }
+    }
+    CommandResult::ok(format_extracted(&texts))
 }

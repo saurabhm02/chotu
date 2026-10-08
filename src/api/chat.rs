@@ -41,6 +41,8 @@ struct AskCommandInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     selected: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    image_paths: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     history: Vec<HistoryMessage>,
 }
 
@@ -109,6 +111,7 @@ pub async fn invoke_ask_command<F>(
     command: &str,
     typed: String,
     selected: Option<String>,
+    image_paths: Vec<String>,
     history: Vec<HistoryMessage>,
     on_event: F,
 ) -> Result<String, String>
@@ -119,6 +122,7 @@ where
         command: command.to_string(),
         typed,
         selected,
+        image_paths,
         history,
     };
     let args = serde_wasm_bindgen::to_value(&input).map_err(|e| e.to_string())?;

@@ -276,3 +276,58 @@ pub fn trash_icon(props: &IconProps) -> Html {
         </svg>
     }
 }
+
+#[function_component(ListIcon)]
+pub fn list_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 5h.01"/>
+            <path d="M3 12h.01"/>
+            <path d="M3 19h.01"/>
+            <path d="M8 5h13"/>
+            <path d="M8 12h13"/>
+            <path d="M8 19h13"/>
+        </svg>
+    }
+}
+
+#[function_component(SpellCheckIcon)]
+pub fn spell_check_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 16 6-12 6 12"/>
+            <path d="M8 12h8"/>
+            <path d="m16 20 2 2 4-4"/>
+        </svg>
+    }
+}
+
+#[function_component(ScanTextIcon)]
+pub fn scan_text_icon(props: &IconProps) -> Html {
+    let cls = if props.class.is_empty() {
+        "w-3.5 h-3.5"
+    } else {
+        props.class
+    };
+    html! {
+        <svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+            <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+            <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+            <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+            <path d="M7 8h8"/>
+            <path d="M7 12h10"/>
+            <path d="M7 16h6"/>
+        </svg>
+    }
+}

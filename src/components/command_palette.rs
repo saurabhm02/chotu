@@ -1,7 +1,8 @@
 use yew::prelude::*;
 
 use crate::components::icons::{
-    ActivityIcon, AlignLeftIcon, ClockIcon, CodeIcon, CropIcon, GlobeIcon, LanguagesIcon, PlusIcon,
+    ActivityIcon, AlignLeftIcon, ClockIcon, CodeIcon, CropIcon, GlobeIcon, LanguagesIcon, ListIcon,
+    PencilIcon, PlusIcon, ScanTextIcon, SpellCheckIcon,
 };
 use crate::models::{Command, Commands};
 
@@ -61,6 +62,10 @@ fn command_icon(cmd: &Commands) -> Html {
         Commands::History => html! { <ClockIcon class="w-3.5 h-3.5" /> },
         Commands::Translate => html! { <LanguagesIcon class="w-3.5 h-3.5" /> },
         Commands::Tldr => html! { <AlignLeftIcon class="w-3.5 h-3.5" /> },
+        Commands::Bullets => html! { <ListIcon class="w-3.5 h-3.5" /> },
+        Commands::Refine => html! { <SpellCheckIcon class="w-3.5 h-3.5" /> },
+        Commands::Rewrite => html! { <PencilIcon class="w-3.5 h-3.5" /> },
+        Commands::Extract => html! { <ScanTextIcon class="w-3.5 h-3.5" /> },
     }
 }
 

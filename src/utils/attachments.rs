@@ -4,7 +4,16 @@ pub const DEFAULT_QUERY: &str = "What is in this image?";
 
 pub fn attachments_to_send(cmd: Option<Commands>, attachments: &[String]) -> Vec<String> {
     match cmd {
-        None | Some(Commands::Explain) => attachments.to_vec(),
+        None
+        | Some(
+            Commands::Explain
+            | Commands::Translate
+            | Commands::Tldr
+            | Commands::Bullets
+            | Commands::Refine
+            | Commands::Rewrite
+            | Commands::Extract,
+        ) => attachments.to_vec(),
         _ => Vec::new(),
     }
 }
@@ -31,9 +40,19 @@ mod tests {
     }
 
     #[test]
-    fn explain_gets_the_attachments() {
-        let result = attachments_to_send(Some(Commands::Explain), &pasted());
-        assert_eq!(result, pasted());
+    fn every_text_command_gets_the_attachments() {
+        for command in [
+            Commands::Explain,
+            Commands::Translate,
+            Commands::Tldr,
+            Commands::Bullets,
+            Commands::Refine,
+            Commands::Rewrite,
+            Commands::Extract,
+        ] {
+            let result = attachments_to_send(Some(command), &pasted());
+            assert_eq!(result, pasted(), "{command:?}");
+        }
     }
 
     #[test]

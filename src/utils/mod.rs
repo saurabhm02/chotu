@@ -1,6 +1,7 @@
 pub mod attachments;
 pub mod context;
 pub mod domain;
+pub mod extract;
 pub mod highlight;
 pub mod markdown;
 pub mod memory;
