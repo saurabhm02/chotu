@@ -1,0 +1,40 @@
+Rewrite the text below so it sounds like a fluent native English speaker saying it naturally in everyday conversation. Make it read like a real person talking, not stiff or robotic.
+
+Rules:
+- Tone: default to relaxed, casual, conversational English, and match the writer's energy. Keep it formal only if the original clearly is, and never sound more formal, stiffer, louder, or more casual than they did.
+- Change only what needs it. Rephrase awkward or non-native wording so it reads like a native speaker, and leave anything that already reads well alone. Keep every key point; do not add ideas or drop information. No edit beats a pointless edit.
+- Mirror the original's formatting exactly. Keep its Markdown (headings, bold, italics, bullet and numbered lists, links, blockquotes, code) along with its structure and order: rewrite the text inside each element, but never flatten a list, heading, or quote into a paragraph, and never merge separate points into one sentence. If the original is plain text with no Markdown, keep it plain and add none of your own.
+- Keep these exactly, character for character; never reword, reorder, or strip them: blockquotes (lines starting with >), fenced code and inline code, raw URLs, link targets, @mentions, #channels, and any emoji, expressive spellings, or slang the writer used ("heyyyy", "gonna", "tbh"). Do not change the wording inside a blockquote or code block at all, and do not add emoji or slang they did not use.
+- Keep the original point of view. Do not invent a narrator: if the text has no "I" or "we" (an imperative or impersonal note), keep it that way. Never turn a directive into "We need to", "We should", or "Let's"; an imperative stays an imperative.
+- Use normal capitalization and punctuation, and no em dashes: use a comma, colon, semicolon, or period instead. If the original already uses them, keeping them is fine.
+- If the text includes an "[Additional instruction]" line, follow it; it can override these defaults. Output only the rewritten text: no preamble, explanation, or quotes.
+
+Example 1
+Input: I am wanting very much that we are finishing the report today if it is possible.
+Output: I'd really like us to finish the report today if we can.
+
+Example 2
+Input: heyyyy so the app was crashing but i fixed it and everything works now 🚀
+Output: Heyyyy, so the app was crashing but I fixed it and everything works now 🚀
+
+Example 3
+Input: @ria @dev hey can you both check the new build when you get a minute
+Output: @ria @dev hey, can you both check the new build when you get a chance?
+
+Example 4
+Input: **Links:**
+- here is the guide for the setup [Setup Guide](https://example.com/setup)
+- this one is good for beginner [Quick Start](https://example.com/start)
+Output: **Links:**
+- The setup guide: [Setup Guide](https://example.com/setup)
+- Good for beginners: [Quick Start](https://example.com/start)
+
+Example 5
+Input: News from the design team:
+> The new icons are ready but the dark theme still has a bug. Details at https://example.com/issues/204. Both ship in 2.3.0 next week.
+Output: Here's the latest from the design team:
+> The new icons are ready but the dark theme still has a bug. Details at https://example.com/issues/204. Both ship in 2.3.0 next week.
+
+Now rewrite only the following text. Do not copy anything from the examples.
+
+Text: $INPUT

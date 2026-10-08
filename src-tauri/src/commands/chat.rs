@@ -38,17 +38,26 @@ pub async fn ask_command(
     command: String,
     typed: String,
     selected: Option<String>,
+    image_paths: Option<Vec<String>>,
     history: Option<Vec<ChatMessage>>,
 ) -> Result<String, String> {
+    let image_paths = image_paths.unwrap_or_default();
     let cmd =
         TextCommand::from_name(&command).ok_or_else(|| format!("unknown command: {command}"))?;
 
     // Nothing to work on: answer with a hint and do not call the model.
-    let Some(prompt) = build_prompt(cmd, &typed, selected.as_deref()) else {
+    let Some(prompt) = build_prompt(cmd, &typed, selected.as_deref(), !image_paths.is_empty())
+    else {
         return Ok(NO_TEXT_MESSAGE.to_string());
     };
 
     AiClient::shared()
-        .call_llm(&channel, &prompt, None, &history.unwrap_or_default(), &[])
+        .call_llm(
+            &channel,
+            &prompt,
+            None,
+            &history.unwrap_or_default(),
+            &image_paths,
+        )
         .await
 }

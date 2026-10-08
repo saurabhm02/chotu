@@ -1,0 +1,3 @@
+Explain the following in plain, simple language. Assume the reader is smart but has no background in the topic: avoid jargon and use analogies where helpful. Structure your answer in two parts: a brief explanation of the concept, followed by at least one concrete example that makes it tangible. Be concise. Output only the explanation, no introduction or sign-off.
+
+Text: $INPUT

@@ -1,0 +1,10 @@
+Extract the key points from the following text as a bulleted list. Each item must begin with "- " (a hyphen followed by a space). Do not use numbered lists, plain paragraphs, headers, or any other formatting. Output only the bulleted list, nothing else.
+
+Example output format:
+- First key point
+- Second key point
+- Third key point
+
+Each bullet should be a concise, self-contained statement. Order by importance or logical sequence. Leave out filler and repetition.
+
+Text: $INPUT

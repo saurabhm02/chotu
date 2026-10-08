@@ -2,6 +2,10 @@
 pub enum TextCommand {
     Translate,
     Tldr,
+    Bullets,
+    Refine,
+    Rewrite,
+    Explain,
 }
 
 impl TextCommand {
@@ -9,6 +13,10 @@ impl TextCommand {
         match name {
             "translate" => Some(Self::Translate),
             "tldr" => Some(Self::Tldr),
+            "bullets" => Some(Self::Bullets),
+            "refine" => Some(Self::Refine),
+            "rewrite" => Some(Self::Rewrite),
+            "explain" => Some(Self::Explain),
             _ => None,
         }
     }
@@ -34,5 +42,22 @@ mod tests {
     #[test]
     fn tldr_is_a_known_name() {
         assert_eq!(TextCommand::from_name("tldr"), Some(TextCommand::Tldr));
+    }
+
+    #[test]
+    fn every_text_command_is_known_by_its_name() {
+        assert_eq!(
+            TextCommand::from_name("bullets"),
+            Some(TextCommand::Bullets)
+        );
+        assert_eq!(TextCommand::from_name("refine"), Some(TextCommand::Refine));
+        assert_eq!(
+            TextCommand::from_name("rewrite"),
+            Some(TextCommand::Rewrite)
+        );
+        assert_eq!(
+            TextCommand::from_name("explain"),
+            Some(TextCommand::Explain)
+        );
     }
 }

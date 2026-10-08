@@ -5,6 +5,10 @@ pub const WEB_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_prompt.
 pub const WEB_EMPTY_PROMPT_TEMPLATE: &str = include_str!("../prompts/websearch_empty_prompt.txt");
 pub const TRANSLATE_PROMPT_TEMPLATE: &str = include_str!("../prompts/translate.txt");
 pub const TLDR_PROMPT_TEMPLATE: &str = include_str!("../prompts/tldr.txt");
+pub const BULLET_PROMPT_TEMPLATE: &str = include_str!("../prompts/bullets.txt");
+pub const REFINE_PROMPT_TEMPLATE: &str = include_str!("../prompts/refine.txt");
+pub const REWRITE_PROMPT_TEMPLATE: &str = include_str!("../prompts/rewrite.txt");
+pub const EXPLAIN_PROMPT_TEMPLATE: &str = include_str!("../prompts/explain.txt");
 
 pub const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
      AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
