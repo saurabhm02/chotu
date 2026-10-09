@@ -15,6 +15,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(services::shortcut::plugin()).setup(|app| {
         services::panel::init(app);
+        services::tray::init(app);
         services::shortcut::register(app)?;
         db::init(app);
         Ok(())

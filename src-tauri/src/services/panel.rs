@@ -27,6 +27,8 @@ mod mac {
             .map_err(|e| e.to_string())?;
 
         panel.set_level(PanelLevel::Floating.value());
+        // The window shadow draws a grey square around the small icon in mini mode.
+        panel.set_has_shadow(false);
         panel.set_collection_behavior(
             CollectionBehavior::new()
                 .full_screen_auxiliary()
