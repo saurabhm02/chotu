@@ -2,6 +2,7 @@ use crate::models::chat::HistoryMessage;
 use crate::models::stream::{Phase, StreamEvent};
 use crate::models::Commands;
 use crate::utils::context::build_context;
+use crate::utils::extract::format_extracted;
 
 use super::chat::{invoke_ask_ai, invoke_ask_command, invoke_ask_web, Attachments};
 use super::ocr::invoke_extract_text;
@@ -85,8 +86,9 @@ where
     };
 
     let attachments = Attachments {
-        context: build_context(selected.as_deref(), None),
+        context: build_context(selected.as_deref(), Some(&screen_text)),
         history,
+        ..Default::default()
     };
     on_event(StreamEvent::Status(Phase::Thinking));
     ask_ai(
@@ -149,12 +151,6 @@ pub async fn run_cmd<F>(
 where
     F: FnMut(StreamEvent) + 'static,
 {
-    let plain_attachments = Attachments {
-        context: build_context(selected.as_deref(), None),
-        image_paths,
-        history: history.clone(),
-    };
-
     match cmd {
         None => {
             let attachments = Attachments {
@@ -193,10 +189,6 @@ where
         }
         Some(Commands::Analyze) => ask_about_screen_text(query, selected, history, on_event).await,
         Some(Commands::Screen) => ask_about_screen_image(query, selected, history, on_event).await,
-        Some(Commands::Translate) => {
-            ask_text_command("translate", query, selected, history, on_event).await
-        }
-        Some(Commands::Tldr) => ask_text_command("tldr", query, selected, history, on_event).await,
         // `/new` and `/history` never get here: `use_chat` handles them before it calls this
         // function. They are listed only because a `match` must cover every command.
         Some(Commands::New) | Some(Commands::History) => CommandResult::ok(String::new()),
@@ -204,6 +196,8 @@ where
     }
 }
 
+/// `/translate`, `/tldr`, `/bullets`, `/refine`, `/rewrite`, `/explain`: the backend builds the
+/// prompt from the command's name, so this only passes the user's text along.
 async fn ask_text_command<F>(
     command: &str,
     typed: String,
@@ -221,6 +215,8 @@ where
     }
 }
 
+/// `/extract`: read the text in the pasted images (or in a screenshot when none are pasted)
+/// and show it as it is. No AI call, so the text is never changed.
 async fn extract_text_command<F>(image_paths: Vec<String>, mut on_event: F) -> CommandResult
 where
     F: FnMut(StreamEvent) + 'static,
