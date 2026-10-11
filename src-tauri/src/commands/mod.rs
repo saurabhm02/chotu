@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod check;
 pub mod history;
 pub mod images;
 pub mod ocr;

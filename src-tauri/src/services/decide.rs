@@ -8,32 +8,32 @@ use crate::models::decision::Decision;
 
 use super::failover;
 
-pub const QUESTION_NAME: &str = "answer";
+pub const QUESTION_ID: &str = "answer";
 
-pub struct Decider {
+pub struct DecisionClient {
     client: reqwest::Client,
     url: String,
     key: String,
     models: Vec<String>,
 }
 
-static SHARED: OnceLock<Decider> = OnceLock::new();
+static SHARED: OnceLock<DecisionClient> = OnceLock::new();
 
-pub fn build_body(model: &str, text: &str, question: &str) -> Value {
+pub fn build_req_body(model: &str, text: &str, question: &str) -> Value {
     let mut que = serde_json::Map::new();
     que.insert(
-        QUESTION_NAME.to_string(),
+        QUESTION_ID.to_string(),
         json!({ "type": "noul", "instructions": question }),
     );
     json!({ "model": model, "state": text, "questions": que })
 }
 
-pub fn read_chance_of_yes(reply: &Value) -> Option<f32> {
-    let chance = reply["answers"][QUESTION_NAME]["noul"].as_f64()? as f32;
+pub fn parse_probability_from_response(reply: &Value) -> Option<f32> {
+    let chance = reply["answers"][QUESTION_ID]["noul"].as_f64()? as f32;
     (0.0..=1.0).contains(&chance).then_some(chance)
 }
 
-impl Decider {
+impl DecisionClient {
     pub fn new(url: String, key: String, models: Vec<String>, wait: Duration) -> Self {
         let client = reqwest::Client::builder()
             .timeout(wait)
@@ -47,8 +47,8 @@ impl Decider {
         }
     }
 
-    pub fn shared() -> &'static Decider {
-        SHARED.get_or_init(Decider::from_env)
+    pub fn shared() -> &'static DecisionClient {
+        SHARED.get_or_init(DecisionClient::from_env)
     }
 
     fn from_env() -> Self {
@@ -58,14 +58,14 @@ impl Decider {
             &DEFAULT_DECISION_MODELS,
         );
         let wait = Duration::from_secs(DECISION_TIMEOUT_S);
-        log::info!("Decider created (models: {models:?})");
+        log::info!("DecisionClient created (models: {models:?})");
         Self::new(DECISION_API_URL.to_string(), key, models, wait)
     }
 
-    pub async fn yes_or_no(&self, text: &str, question: &str) -> Option<Decision> {
+    pub async fn ask_yes_or_no(&self, text: &str, question: &str) -> Option<Decision> {
         for model in &self.models {
-            if let Some(chances_yes) = self.ask_model(model, text, question).await {
-                return Some(Decision::from_chance(chances_yes));
+            if let Some(probability_of_yes) = self.ask_model(model, text, question).await {
+                return Some(Decision::from_probability(probability_of_yes));
             }
         }
         None
@@ -78,7 +78,7 @@ impl Decider {
             .client
             .post(&self.url)
             .bearer_auth(&self.key)
-            .json(&build_body(model, text, question))
+            .json(&build_req_body(model, text, question))
             .send()
             .await
             .inspect_err(|e| log::warn!("decision model {model} did not answer: {e}"))
@@ -96,7 +96,7 @@ impl Decider {
             .inspect_err(|e| log::warn!("decision model {model} sent a reply we cannot read: {e}"))
             .ok()?;
 
-        let chance_of_yes = read_chance_of_yes(&reply);
+        let chance_of_yes = parse_probability_from_response(&reply);
 
         match chance_of_yes {
             Some(chance) => log::info!(
@@ -119,7 +119,7 @@ mod tests {
     const QUESTION: &str = "Does the text contain a password?";
 
     fn reply_with_chance(chance: f64) -> String {
-        json!({ "answers": { QUESTION_NAME: { "type": "noul", "noul": chance } } }).to_string()
+        json!({ "answers": { QUESTION_ID: { "type": "noul", "noul": chance } } }).to_string()
     }
 
     async fn read_request(socket: &mut tokio::net::TcpStream) {
@@ -176,9 +176,9 @@ mod tests {
         url
     }
 
-    fn decider_at(url: String, models: &[&str]) -> Decider {
+    fn decider_at(url: String, models: &[&str]) -> DecisionClient {
         let models = models.iter().map(|m| m.to_string()).collect();
-        Decider::new(
+        DecisionClient::new(
             url,
             "test-key".to_string(),
             models,
@@ -188,17 +188,17 @@ mod tests {
 
     #[test]
     fn the_message_has_the_model_the_text_and_the_question() {
-        let body = build_body("some/model", "my password is x", QUESTION);
+        let body = build_req_body("some/model", "my password is x", QUESTION);
         assert_eq!(body["model"], "some/model");
         assert_eq!(body["state"], "my password is x");
-        assert_eq!(body["questions"][QUESTION_NAME]["type"], "noul");
-        assert_eq!(body["questions"][QUESTION_NAME]["instructions"], QUESTION);
+        assert_eq!(body["questions"][QUESTION_ID]["type"], "noul");
+        assert_eq!(body["questions"][QUESTION_ID]["instructions"], QUESTION);
     }
 
     #[test]
     fn a_good_reply_gives_the_chance() {
         let reply: Value = serde_json::from_str(&reply_with_chance(0.97)).unwrap();
-        let chance = read_chance_of_yes(&reply).unwrap();
+        let chance = parse_probability_from_response(&reply).unwrap();
         assert!((chance - 0.97).abs() < 1e-6);
     }
 
@@ -207,14 +207,14 @@ mod tests {
         let odd = [
             json!({}),
             json!({ "answers": {} }),
-            json!({ "answers": { QUESTION_NAME: { "type": "noul" } } }),
-            json!({ "answers": { QUESTION_NAME: { "noul": "high" } } }),
-            json!({ "answers": { QUESTION_NAME: { "noul": 1.5 } } }),
-            json!({ "answers": { QUESTION_NAME: { "noul": -0.2 } } }),
+            json!({ "answers": { QUESTION_ID: { "type": "noul" } } }),
+            json!({ "answers": { QUESTION_ID: { "noul": "high" } } }),
+            json!({ "answers": { QUESTION_ID: { "noul": 1.5 } } }),
+            json!({ "answers": { QUESTION_ID: { "noul": -0.2 } } }),
             json!("just text"),
         ];
         for reply in odd {
-            assert_eq!(read_chance_of_yes(&reply), None, "{reply}");
+            assert_eq!(parse_probability_from_response(&reply), None, "{reply}");
         }
     }
 
@@ -222,7 +222,7 @@ mod tests {
     async fn a_working_model_gives_a_decision() {
         let url = fake_server(vec![(200, Some(reply_with_chance(0.99)))]).await;
         let decision = decider_at(url, &["one"])
-            .yes_or_no("text", QUESTION)
+            .ask_yes_or_no("text", QUESTION)
             .await
             .unwrap();
         assert_eq!(decision.verdict, Verdict::Yes);
@@ -236,7 +236,7 @@ mod tests {
         ])
         .await;
         let decision = decider_at(url, &["broken", "working"])
-            .yes_or_no("text", QUESTION)
+            .ask_yes_or_no("text", QUESTION)
             .await
             .unwrap();
         assert_eq!(decision.verdict, Verdict::No);
@@ -247,7 +247,7 @@ mod tests {
         let url = fake_server(vec![(200, None), (200, Some(reply_with_chance(0.5)))]).await;
         let started = Instant::now();
         let decision = decider_at(url, &["silent", "working"])
-            .yes_or_no("text", QUESTION)
+            .ask_yes_or_no("text", QUESTION)
             .await
             .unwrap();
         assert_eq!(decision.verdict, Verdict::Unsure);
@@ -258,7 +258,7 @@ mod tests {
     async fn a_reply_we_cannot_use_counts_as_no_answer() {
         let url = fake_server(vec![(200, Some("not json".into()))]).await;
         assert_eq!(
-            decider_at(url, &["one"]).yes_or_no("text", QUESTION).await,
+            decider_at(url, &["one"]).ask_yes_or_no("text", QUESTION).await,
             None
         );
     }
@@ -266,26 +266,26 @@ mod tests {
     #[tokio::test]
     async fn nothing_listening_gives_no_answer_and_no_crash() {
         let decider = decider_at("http://127.0.0.1:1/decisions".to_string(), &["one", "two"]);
-        assert_eq!(decider.yes_or_no("text", QUESTION).await, None);
+        assert_eq!(decider.ask_yes_or_no("text", QUESTION).await, None);
     }
 
     #[tokio::test]
     async fn no_models_gives_no_answer() {
         let decider = decider_at("http://127.0.0.1:1/decisions".to_string(), &[]);
-        assert_eq!(decider.yes_or_no("text", QUESTION).await, None);
+        assert_eq!(decider.ask_yes_or_no("text", QUESTION).await, None);
     }
 
     #[tokio::test]
     #[ignore]
     async fn the_real_models_answer() {
         dotenvy::dotenv().ok();
-        let decider = Decider::shared();
+        let decider = DecisionClient::shared();
         let secret = decider
-            .yes_or_no("my password is hunter2", QUESTION)
+            .ask_yes_or_no("my password is hunter2", QUESTION)
             .await
             .expect("no decision model answered");
         let plain = decider
-            .yes_or_no("Let's meet at 5pm tomorrow near the cafe", QUESTION)
+            .ask_yes_or_no("Let's meet at 5pm tomorrow near the cafe", QUESTION)
             .await
             .expect("no decision model answered");
         println!("secret: {secret:?}\nplain: {plain:?}");

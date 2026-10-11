@@ -1,4 +1,4 @@
-use crate::config::{SURE_NO_PERCENTAGE, SURE_YES_PERCENTAGE};
+use crate::config::{SURE_NO_THRESHOLD, SURE_YES_THRESHOLD};
 
 /// How a yes/no question was answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,14 +14,14 @@ pub enum Verdict {
 pub struct Decision {
     pub verdict: Verdict,
     /// How likely "yes" is, from 0.0 (never) to 1.0 (certain).
-    pub chances_yes: f32,
+    pub probability_of_yes: f32,
 }
 
 /// Turns the chance of "yes" into a verdict.
-pub fn decide_verdict(chances_yes: f32) -> Verdict {
-    if chances_yes >= SURE_YES_PERCENTAGE {
+pub fn decide_verdict_from_probability(probability_of_yes: f32) -> Verdict {
+    if probability_of_yes >= SURE_YES_THRESHOLD {
         Verdict::Yes
-    } else if chances_yes <= SURE_NO_PERCENTAGE {
+    } else if probability_of_yes <= SURE_NO_THRESHOLD {
         Verdict::No
     } else {
         Verdict::Unsure
@@ -29,10 +29,10 @@ pub fn decide_verdict(chances_yes: f32) -> Verdict {
 }
 
 impl Decision {
-    pub fn from_chance(chances_yes: f32) -> Self {
+    pub fn from_probability(probability_of_yes: f32) -> Self {
         Self {
-            verdict: decide_verdict(chances_yes),
-            chances_yes,
+            verdict: decide_verdict_from_probability(probability_of_yes),
+            probability_of_yes,
         }
     }
 }
@@ -43,29 +43,35 @@ mod tests {
 
     #[test]
     fn a_high_chance_is_a_yes() {
-        assert_eq!(decide_verdict(0.97), Verdict::Yes);
+        assert_eq!(decide_verdict_from_probability(0.97), Verdict::Yes);
     }
 
     #[test]
     fn a_low_chance_is_a_no() {
-        assert_eq!(decide_verdict(0.02), Verdict::No);
+        assert_eq!(decide_verdict_from_probability(0.02), Verdict::No);
     }
 
     #[test]
     fn a_middle_chance_is_unsure() {
-        assert_eq!(decide_verdict(0.5), Verdict::Unsure);
+        assert_eq!(decide_verdict_from_probability(0.5), Verdict::Unsure);
     }
 
     #[test]
     fn the_edges_count_as_sure() {
-        assert_eq!(decide_verdict(SURE_YES_PERCENTAGE), Verdict::Yes);
-        assert_eq!(decide_verdict(SURE_NO_PERCENTAGE), Verdict::No);
+        assert_eq!(
+            decide_verdict_from_probability(SURE_YES_THRESHOLD),
+            Verdict::Yes
+        );
+        assert_eq!(
+            decide_verdict_from_probability(SURE_NO_THRESHOLD),
+            Verdict::No
+        );
     }
 
     #[test]
     fn a_decision_keeps_the_number_it_came_from() {
-        let decision = Decision::from_chance(0.9);
+        let decision = Decision::from_probability(0.9);
         assert_eq!(decision.verdict, Verdict::Yes);
-        assert_eq!(decision.chances_yes, 0.9);
+        assert_eq!(decision.probability_of_yes, 0.9);
     }
 }

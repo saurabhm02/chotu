@@ -27,10 +27,10 @@ pub const DEFAULT_DECISION_MODELS: [&str; 2] =
     ["respan/span-01-lite:free", "inception/mercury-decide:free"];
 
 /// A chance of "yes" at or above this counts as a sure yes.
-pub const SURE_YES_PERCENTAGE: f32 = 0.8;
+pub const SURE_YES_THRESHOLD: f32 = 0.8;
 
 /// A chance of "yes" at or below this counts as a sure no.
-pub const SURE_NO_PERCENTAGE: f32 = 0.3;
+pub const SURE_NO_THRESHOLD: f32 = 0.3;
 
 pub const TIMEOUT_S: u64 = 5;
 pub const PAGE_CONTENT_CHAR: usize = 1500;
@@ -63,3 +63,9 @@ pub const TITLE_PROMPT: &str = "Write a title of 3 to 6 words for the conversati
 Reply with the title only: no quotes, no full stop, no explanation.";
 
 pub const TITLE_TIMEOUT_S: u64 = 20;
+
+pub const CHECK_MISSING_QUESTION_MESSAGE: &str =
+    "Type a yes/no question after the command, for example: /check is this a scam?";
+pub const CHECK_MISSING_TEXT_MESSAGE: &str = "Highlight the text you want to check first.";
+pub const DECISION_MODELS_UNAVAILABLE_MESSAGE: &str =
+    "No answer right now. The free decision models may be busy, so try again in a minute.";
