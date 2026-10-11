@@ -34,6 +34,7 @@ It is all Rust. The app is **Tauri v2** and the interface is **Yew** (Rust compi
 | `/refine` | Fix grammar, spelling and punctuation, and keep your own voice | `/refine hey just wanted to follow up on the thing` |
 | `/rewrite` | Make text sound natural and casual | `/rewrite make it shorter` |
 | `/extract` | Show all the text in a pasted image, or in a screenshot if you pasted none. No AI involved, so nothing gets changed | `/extract` |
+| `/check` | Answer a yes/no question about highlighted text, with a percentage. It is a helper's guess, not a fact | `/check is this a scam?` |
 | `/ss` | Read the text on your screen, then answer your question | `/ss what is this error?` |
 | `/screen` | Show your screen to a vision model | `/screen what is this chart?` |
 | `/new` | Start a new chat | |
