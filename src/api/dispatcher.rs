@@ -5,6 +5,7 @@ use crate::utils::context::build_context;
 use crate::utils::extract::format_extracted;
 
 use super::chat::{invoke_ask_ai, invoke_ask_command, invoke_ask_web, Attachments};
+use super::check::invoke_check_text;
 use super::ocr::invoke_extract_text;
 use super::screen::invoke_capture_screen;
 
@@ -193,6 +194,7 @@ where
         // function. They are listed only because a `match` must cover every command.
         Some(Commands::New) | Some(Commands::History) => CommandResult::ok(String::new()),
         Some(Commands::Extract) => extract_text_command(image_paths, on_event).await,
+        Some(Commands::Check) => check_text_command(query, selected, on_event).await,
     }
 }
 
@@ -240,4 +242,19 @@ where
         }
     }
     CommandResult::ok(format_extracted(&texts))
+}
+
+async fn check_text_command<F>(
+    question: String,
+    text: Option<String>,
+    mut on_event: F,
+) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    on_event(StreamEvent::Status(Phase::Thinking));
+    match invoke_check_text(text, question).await {
+        Ok(text) => CommandResult::ok(text),
+        Err(e) => CommandResult::error(e),
+    }
 }

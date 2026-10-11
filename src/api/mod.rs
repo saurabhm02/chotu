@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod check;
 pub mod clipboard;
 pub mod dispatcher;
 pub mod history;

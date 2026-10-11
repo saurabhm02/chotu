@@ -62,6 +62,7 @@ mod tests {
             Commands::Screen,
             Commands::Analyze,
             Commands::New,
+            Commands::Check,
         ] {
             assert!(attachments_to_send(Some(command), &pasted()).is_empty());
         }

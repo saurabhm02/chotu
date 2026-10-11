@@ -12,6 +12,7 @@ pub enum Commands {
     Refine,
     Rewrite,
     Extract,
+    Check,
 }
 
 impl Commands {
@@ -31,6 +32,7 @@ impl Commands {
             Commands::Refine => "refine",
             Commands::Rewrite => "rewrite",
             Commands::Extract => "extract",
+            Commands::Check => "check",
         }
     }
 }
@@ -103,6 +105,11 @@ pub fn all_commands() -> Vec<Command> {
             name: "extract",
             description: "Read all the text in an image or screenshot",
             cmd: Commands::Extract,
+        },
+        Command {
+            name: "check",
+            description: "Answer a yes/no question about text, with a percentage",
+            cmd: Commands::Check,
         },
     ]
 }
