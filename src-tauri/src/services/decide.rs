@@ -1,10 +1,15 @@
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::env;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use crate::config::{DECISION_API_URL, DECISION_TIMEOUT_S, DEFAULT_DECISION_MODELS};
-use crate::models::decision::Decision;
+use crate::config::{
+    DECISION_API_URL, DECISION_TIMEOUT_S, DEFAULT_DECISION_MODELS, NOUL_ONLY_DECISION_MODELS,
+};
+use crate::models::decision::{
+    Answer, Answers, ChoiceAnswer, Decision, DecisionQuestion, QuestionType, ScoreAnswer,
+};
 
 use super::failover;
 
@@ -71,14 +76,21 @@ impl DecisionClient {
         None
     }
 
-    pub async fn ask_model(&self, model: &str, text: &str, question: &str) -> Option<f32> {
-        let started = Instant::now();
 
-        let res = self
-            .client
-            .post(&self.url)
-            .bearer_auth(&self.key)
-            .json(&build_req_body(model, text, question))
+    /// Sends `body` to one model. `timeout` replaces the client's usual limit for this call.
+    /// Any problem (offline, slow, an error status, an unreadable reply) gives `None`.
+    async fn post_to_model(
+        &self,
+        model: &str,
+        body: &Value,
+        timeout: Option<Duration>,
+    ) -> Option<Value> {
+        let mut request = self.client.post(&self.url).bearer_auth(&self.key).json(body);
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+
+        let res = request
             .send()
             .await
             .inspect_err(|e| log::warn!("decision model {model} did not answer: {e}"))
@@ -90,11 +102,63 @@ impl DecisionClient {
             return None;
         }
 
-        let reply: Value = res
-            .json()
+        res.json()
             .await
             .inspect_err(|e| log::warn!("decision model {model} sent a reply we cannot read: {e}"))
-            .ok()?;
+            .ok()
+    }
+
+    /// Asks several questions about `text` in one call, so it counts once against the free
+    /// limit. The first model that answers every question wins; otherwise the fullest reply is
+    /// returned. `None` means nothing usable came back, or the questions were empty or shared an id.
+    pub async fn ask_questions(
+        &self,
+        text: &str,
+        questions: &[DecisionQuestion],
+        timeout: Duration,
+    ) -> Option<Answers> {
+        let unique_ids: HashSet<&str> = questions.iter().map(|q| q.id.as_str()).collect();
+        if questions.is_empty() || unique_ids.len() != questions.len() {
+            log::warn!("decision questions are empty or share an id, nothing was asked");
+            return None;
+        }
+
+        let needs_full_model = questions.iter().any(DecisionQuestion::needs_full_model);
+        let mut best: Option<Answers> = None;
+        for model in &self.models {
+            if needs_full_model && NOUL_ONLY_DECISION_MODELS.contains(&model.as_str()) {
+                continue;
+            }
+
+            let started = Instant::now();
+            let body = build_questions_body(model, text, questions);
+            let Some(reply) = self.post_to_model(model, &body, Some(timeout)).await else {
+                continue;
+            };
+
+            let answers = parse_answers(&reply, questions);
+            log::info!(
+                "decision model {model}: {} of {} answers in {} ms",
+                answers.len(),
+                questions.len(),
+                started.elapsed().as_millis()
+            );
+            if answers.len() == questions.len() {
+                return Some(answers);
+            }
+            if answers.len() > best.as_ref().map_or(0, Answers::len) {
+                best = Some(answers);
+            }
+        }
+        best
+    }
+
+    pub async fn ask_model(&self, model: &str, text: &str, question: &str) -> Option<f32> {
+        let started = Instant::now();
+
+        let reply = self
+            .post_to_model(model, &build_req_body(model, text, question), None)
+            .await?;
 
         let chance_of_yes = parse_probability_from_response(&reply);
 
@@ -108,6 +172,101 @@ impl DecisionClient {
         chance_of_yes
     }
 }
+
+fn build_questions_body(model: &str, text: &str, questions: &[DecisionQuestion]) -> Value {
+    let mut body_questions = serde_json::Map::new();
+    for question in questions {
+        let body = match &question.question_type {
+            QuestionType::YesNo => json!({
+                "type": "noul",
+                "instructions": question.instruction,
+            }),
+            QuestionType::Choice { options } => {
+                let criteria: serde_json::Map<String, Value> = options
+                    .iter()
+                    .map(|option| (option.id.clone(), json!(option.description)))
+                    .collect();
+                json!({
+                    "type": "choice",
+                    "instructions": question.instruction,
+                    "criteria": criteria,
+                })
+            }
+            QuestionType::Score { levels } => json!({
+                "type": "score",
+                "instructions": question.instruction,
+                "criteria": levels,
+            }),
+        };
+        body_questions.insert(question.id.clone(), body);
+    }
+    json!({ "model": model, "state": text, "questions": body_questions })
+}
+
+fn unit_interval(value: &Value) -> Option<f32> {
+    let number = value.as_f64()? as f32;
+    (0.0..=1.0).contains(&number).then_some(number)
+}
+
+fn parse_answer(answer: &Value, question_type: &QuestionType) -> Option<Answer> {
+    let confidence = unit_interval(&answer["confidence"]).unwrap_or(0.0);
+    match question_type {
+        QuestionType::YesNo => {
+            unit_interval(&answer["noul"]).map(|p| Answer::YesNo(Decision::from_probability(p)))
+        }
+        QuestionType::Choice { options } => {
+            let chosen = answer["choice"].as_str()?;
+            if !options.iter().any(|option| option.id == chosen) {
+                return None;
+            }
+            let probabilities = options
+                .iter()
+                .map(|option| {
+                    let probability = unit_interval(&answer["probabilities"][option.id.as_str()]);
+                    (option.id.clone(), probability.unwrap_or(0.0))
+                })
+                .collect();
+            Some(Answer::Choice(ChoiceAnswer {
+                chosen: chosen.to_string(),
+                probabilities,
+                confidence,
+            }))
+        }
+        QuestionType::Score { levels } => {
+            let value = answer["score"].as_f64()? as f32;
+            let highest = levels.len().checked_sub(1)?;
+            if !(0.0..=highest as f32).contains(&value) {
+                return None;
+            }
+            let level = (value.round() as usize).min(highest);
+            let probabilities = (0..levels.len())
+                .map(|index| {
+                    unit_interval(&answer["probabilities"][index.to_string().as_str()])
+                        .unwrap_or(0.0)
+                })
+                .collect();
+            Some(Answer::Score(ScoreAnswer {
+                value,
+                level,
+                label: levels[level].clone(),
+                probabilities,
+                confidence,
+            }))
+        }
+    }
+}
+
+fn parse_answers(reply: &Value, questions: &[DecisionQuestion]) -> Answers {
+    let mut answers = Answers::default();
+    for question in questions {
+        let answer = &reply["answers"][question.id.as_str()];
+        if let Some(parsed) = parse_answer(answer, &question.question_type) {
+            answers.insert(&question.id, parsed);
+        }
+    }
+    answers
+}
+
 
 #[cfg(test)]
 mod tests {

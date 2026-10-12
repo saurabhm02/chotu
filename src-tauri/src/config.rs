@@ -69,3 +69,15 @@ pub const CHECK_MISSING_QUESTION_MESSAGE: &str =
 pub const CHECK_MISSING_TEXT_MESSAGE: &str = "Highlight the text you want to check first.";
 pub const DECISION_MODELS_UNAVAILABLE_MESSAGE: &str =
     "No answer right now. The free decision models may be busy, so try again in a minute.";
+
+pub const AUTO_WEB_MIN_WORDS: usize = 2;
+pub const AUTO_WEB_MAX_CHARS: usize = 400;
+pub const AUTO_WEB_TIMEOUT_S: u64 = 3;
+
+pub const AUTO_WEB_QUESTION: &str = "Does answering this question correctly need fresh information from the internet, such as today's news, current prices, live scores, the weather, recent events, or the latest version of something?";
+
+/// The longest a call with several or harder questions (a scorecard) may take.
+pub const DECISION_SLOW_TIMEOUT_S: u64 = 10;
+
+/// Decision models that only answer yes/no. Choice and score questions skip them.
+pub const NOUL_ONLY_DECISION_MODELS: [&str; 1] = ["respan/span-01-lite:free"];

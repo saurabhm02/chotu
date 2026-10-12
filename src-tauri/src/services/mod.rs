@@ -12,7 +12,7 @@ pub mod selection;
 #[cfg(desktop)]
 pub mod shortcut;
 pub mod tray;
-pub mod web_answer;
+pub mod web;
 pub mod web_search;
 #[cfg(target_os = "macos")]
 pub mod window;

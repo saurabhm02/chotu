@@ -1,12 +1,19 @@
 //! "/web" end to end: search the web, then have the LLM answer from the results.
+use std::env;
+use std::future::Future;
+use std::sync::OnceLock;
 use tauri::ipc::Channel;
 
 use super::llm::AiClient;
 use super::web_search::{read_pages, search_top};
 use crate::config::SEARCH_SELECTED_CHARS;
 use crate::models::chat::ChatMessage;
+use crate::models::decision::{Decision, Verdict};
 use crate::models::stream::{Phase, Source, StreamEvent};
 use crate::models::web::WebSearchResponse;
+use crate::utils::web::{is_auto_web_enabled, is_worth_asking};
+
+static ENABLED: OnceLock<bool> = OnceLock::new();
 
 /// The words we send to the search engine: the question, then the start of the
 /// highlighted text (if any) squeezed onto one line.
@@ -59,6 +66,31 @@ pub async fn answer(
     Ok(WebSearchResponse { ans, sources })
 }
 
+pub fn auto_web_enabled() -> bool {
+    *ENABLED.get_or_init(|| {
+        let enabled = is_auto_web_enabled(env::var("AUTO_WEB").ok().as_deref());
+        log::info!("auto web search: enabled:{enabled}");
+        enabled
+    })
+}
+
+pub async fn need_web_search<F, Fut>(enabled: bool, question: &str, ask_model: F) -> bool
+where
+    F: FnOnce(String) -> Fut,
+    Fut: Future<Output = Option<Decision>>,
+{
+    if !enabled || !is_worth_asking(question) {
+        return false;
+    }
+    matches!(
+        ask_model(question.trim().to_string()).await,
+        Some(Decision {
+            verdict: Verdict::Yes,
+            ..
+        })
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +119,58 @@ mod tests {
     #[test]
     fn selected_text_alone_is_searched_when_there_is_no_question() {
         assert_eq!(search_text("", Some("rudraksha")), "rudraksha");
+    }
+
+    async fn run(enabled: bool, question: &str, model_says: Option<f32>) -> (bool, u32) {
+        let calls = std::cell::Cell::new(0);
+        let search = need_web_search(enabled, question, |_text| {
+            calls.set(calls.get() + 1);
+            async move { model_says.map(Decision::from_probability) }
+        })
+        .await;
+        (search, calls.get())
+    }
+
+    #[tokio::test]
+    async fn a_sure_yes_searches() {
+        assert_eq!(
+            run(true, "bitcoin price right now", Some(0.95)).await,
+            (true, 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_no_an_unsure_answer_or_no_answer_does_not_search() {
+        for answer in [Some(0.05), Some(0.55), None] {
+            assert_eq!(
+                run(true, "what is a closure in rust", answer).await,
+                (false, 1),
+                "{answer:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn switched_off_never_asks_the_model() {
+        assert_eq!(
+            run(false, "bitcoin price right now", Some(0.99)).await,
+            (false, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_one_word_question_never_asks_the_model() {
+        assert_eq!(run(true, "thanks", Some(0.99)).await, (false, 0));
+    }
+
+    #[tokio::test]
+    async fn the_model_gets_the_trimmed_question() {
+        let search = need_web_search(true, "  weather today \n", |text| async move {
+            assert_eq!(text, "weather today");
+            Some(Decision::from_probability(0.9))
+        })
+        .await;
+        assert!(search);
     }
 
     #[ignore]
