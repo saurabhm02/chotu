@@ -18,7 +18,7 @@ It is all Rust. The app is **Tauri v2** and the interface is **Yew** (Rust compi
 | **Selected text** | Chotu reads it through the macOS Accessibility API and falls back to `Cmd + C` when that fails |
 | **Your screen** | `/screen` sends a screenshot to a vision model. `/ss` reads the text on your screen (Apple Vision) and asks about that text instead |
 | **Images** | Paste a screenshot, an image from a browser, or an image file you copied in Finder. They stack next to the send button, you can click one to see it large, and they are sent along with your question and saved in the chat |
-| **Web search** | `/web` searches DuckDuckGo, reads the top pages and answers with numbered sources you can click |
+| **Web search** | `/web` searches DuckDuckGo, reads the top pages and answers with numbered sources you can click. A plain question that needs fresh facts (news, prices, scores, weather) is searched automatically. Set `AUTO_WEB=off` in `.env` to turn that off |
 | **Text commands** | `/translate`, `/tldr`, `/bullets`, `/refine`, `/rewrite`, `/explain` and `/extract`. They work on highlighted text, on text you type, or on a pasted image |
 | **Models** | You list your text and vision models in `.env`, and Chotu tries the next one if a model fails |
 
@@ -34,6 +34,7 @@ It is all Rust. The app is **Tauri v2** and the interface is **Yew** (Rust compi
 | `/refine` | Fix grammar, spelling and punctuation, and keep your own voice | `/refine hey just wanted to follow up on the thing` |
 | `/rewrite` | Make text sound natural and casual | `/rewrite make it shorter` |
 | `/extract` | Show all the text in a pasted image, or in a screenshot if you pasted none. No AI involved, so nothing gets changed | `/extract` |
+| `/chat` | Just answer, never search the web. Use it when an automatic search was not wanted | `/chat who is the prime minister of india` |
 | `/check` | Answer a yes/no question about highlighted text, with a percentage. It is a helper's guess, not a fact | `/check is this a scam?` |
 | `/ss` | Read the text on your screen, then answer your question | `/ss what is this error?` |
 | `/screen` | Show your screen to a vision model | `/screen what is this chart?` |
