@@ -8,6 +8,7 @@ use super::chat::{invoke_ask_ai, invoke_ask_command, invoke_ask_web, Attachments
 use super::check::invoke_check_text;
 use super::ocr::invoke_extract_text;
 use super::screen::invoke_capture_screen;
+use super::web::invoke_should_search_web;
 
 /// (response text, sources)
 pub struct CommandResult {
@@ -153,23 +154,9 @@ where
     F: FnMut(StreamEvent) + 'static,
 {
     match cmd {
-        None => {
-            let attachments = Attachments {
-                context: build_context(selected.as_deref(), None),
-                image_paths,
-                history,
-            };
-            ask_ai(query, attachments, on_event).await
-        }
-        Some(Commands::Web) => match invoke_ask_web(query, selected, history, on_event).await {
-            Ok(res) => CommandResult {
-                text: res.ans,
-                sources: res.sources,
-                is_error: false,
-                screenshots: Vec::new(),
-            },
-            Err(e) => CommandResult::error(e),
-        },
+        None => ask_plain_question(query, selected, history, image_paths, on_event).await,
+        Some(Commands::Chat) => chat_command(query, selected, history, image_paths, on_event).await,
+        Some(Commands::Web) => ask_web_command(query, selected, history, on_event).await,
         Some(
             command @ (Commands::Explain
             | Commands::Translate
@@ -256,5 +243,116 @@ where
     match invoke_check_text(text, question).await {
         Ok(text) => CommandResult::ok(text),
         Err(e) => CommandResult::error(e),
+    }
+}
+
+async fn ask_web_command<F>(
+    question: String,
+    selected: Option<String>,
+    history: Vec<HistoryMessage>,
+    on_event: F,
+) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    match invoke_ask_web(question, selected, history, on_event).await {
+        Ok(res) => CommandResult {
+            text: res.ans,
+            sources: res.sources,
+            is_error: false,
+            screenshots: Vec::new(),
+        },
+        Err(e) => CommandResult::error(e),
+    }
+}
+
+fn may_search_automatically(
+    question: &str,
+    selected: Option<&str>,
+    image_paths: &[String],
+) -> bool {
+    let has_selected_text = selected.is_some_and(|text| !text.trim().is_empty());
+    !question.trim().is_empty() && !has_selected_text && image_paths.is_empty()
+}
+
+async fn ask_plain_question<F>(
+    question: String,
+    selected: Option<String>,
+    history: Vec<HistoryMessage>,
+    image_paths: Vec<String>,
+    mut on_event: F,
+) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    if may_search_automatically(&question, selected.as_deref(), &image_paths) {
+        on_event(StreamEvent::Status(Phase::Deciding));
+        match invoke_should_search_web(&question).await {
+            Ok(true) => return ask_web_command(question, None, history, on_event).await,
+            Ok(false) => {}
+            Err(e) => log::warn!("could not decide about a web search, answering directly: {e}"),
+        }
+        on_event(StreamEvent::ClearStatus);
+    }
+    chat_command(question, selected, history, image_paths, on_event).await
+}
+
+async fn chat_command<F>(
+    question: String,
+    selected: Option<String>,
+    history: Vec<HistoryMessage>,
+    image_paths: Vec<String>,
+    on_event: F,
+) -> CommandResult
+where
+    F: FnMut(StreamEvent) + 'static,
+{
+    let attachments = Attachments {
+        context: build_context(selected.as_deref(), None),
+        image_paths,
+        history,
+    };
+    ask_ai(question, attachments, on_event).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_plain_question_may_be_searched() {
+        assert!(may_search_automatically("bitcoin price today", None, &[]));
+    }
+
+    #[test]
+    fn highlighted_text_stops_the_automatic_search() {
+        assert!(!may_search_automatically(
+            "what does this mean?",
+            Some("some highlighted text"),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn blank_highlighted_text_does_not_count() {
+        assert!(may_search_automatically(
+            "bitcoin price today",
+            Some("  \n "),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn a_pasted_image_stops_the_automatic_search() {
+        assert!(!may_search_automatically(
+            "what is this?",
+            None,
+            &["a.png".to_string()]
+        ));
+    }
+
+    #[test]
+    fn an_empty_question_is_not_searched() {
+        assert!(!may_search_automatically("   ", None, &[]));
     }
 }

@@ -100,6 +100,7 @@ pub fn status_strip(props: &StatusStripProps) -> Html {
         // Once the answer is flowing, a web answer goes back to "Reading sources".
         Phase::Thinking if props.answering && has_sources => format!("Reading sources ({count})"),
         Phase::Thinking => "Thinking".to_string(),
+        Phase::Deciding => "Checking if this needs the web".to_string(),
     };
 
     let toggle = {

@@ -8,6 +8,7 @@ pub enum StreamEvent {
     Sources(Vec<Source>),
     Token(String),
     Model(String),
+    ClearStatus,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -21,6 +22,7 @@ pub enum Phase {
     Searching,
     Reading,
     Thinking,
+    Deciding,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
@@ -93,6 +95,22 @@ mod tests {
         assert_eq!(
             StreamEvent::from_json(r#"{"type":"Model","data":"gemma"}"#),
             Some(StreamEvent::Model("gemma".into()))
+        );
+    }
+
+    #[test]
+    fn reads_the_deciding_status() {
+        assert_eq!(
+            StreamEvent::from_json(r#"{"type":"Status","data":"deciding"}"#),
+            Some(StreamEvent::Status(Phase::Deciding))
+        );
+    }
+
+    #[test]
+    fn reads_the_clear_status_message() {
+        assert_eq!(
+            StreamEvent::from_json(r#"{"type":"ClearStatus"}"#),
+            Some(StreamEvent::ClearStatus)
         );
     }
 

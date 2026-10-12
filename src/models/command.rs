@@ -13,6 +13,7 @@ pub enum Commands {
     Rewrite,
     Extract,
     Check,
+    Chat,
 }
 
 impl Commands {
@@ -33,6 +34,7 @@ impl Commands {
             Commands::Rewrite => "rewrite",
             Commands::Extract => "extract",
             Commands::Check => "check",
+            Commands::Chat => "chat",
         }
     }
 }
@@ -111,6 +113,11 @@ pub fn all_commands() -> Vec<Command> {
             description: "Answer a yes/no question about text, with a percentage",
             cmd: Commands::Check,
         },
+        Command {
+            name: "chat",
+            description: "Just answer, without searching the web",
+            cmd: Commands::Chat,
+        },
     ]
 }
 
@@ -152,5 +159,21 @@ mod tests {
         let (cmd, rest) = detect_cmd("/translate hindi good morning");
         assert_eq!(cmd, Some(Commands::Translate));
         assert_eq!(rest, "hindi good morning");
+    }
+
+    #[test]
+    fn chat_is_found_with_its_question() {
+        let (cmd, rest) = detect_cmd("/chat who is the pm of india");
+        assert_eq!(cmd, Some(Commands::Chat));
+        assert_eq!(rest, "who is the pm of india");
+    }
+
+    #[test]
+    fn check_and_chat_do_not_get_mixed_up() {
+        assert_eq!(
+            detect_cmd("/check is this a scam?").0,
+            Some(Commands::Check)
+        );
+        assert_eq!(detect_cmd("/chat hello there").0, Some(Commands::Chat));
     }
 }

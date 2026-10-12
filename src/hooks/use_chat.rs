@@ -42,6 +42,7 @@ enum HistoryAction {
     SetAttachments(Vec<String>),
     /// Shows a saved chat in place of the current one.
     Replace(Vec<ChatTurn>),
+    ClearStatus,
 }
 
 impl Reducible for History {
@@ -90,6 +91,11 @@ impl Reducible for History {
             HistoryAction::SetAttachments(paths) => {
                 if let Some(turn) = turns.last_mut() {
                     turn.attachments = paths;
+                }
+            }
+            HistoryAction::ClearStatus => {
+                if let Some(turn) = turns.last_mut() {
+                    turn.status = None;
                 }
             }
         }
@@ -307,6 +313,7 @@ async fn send_and_stream_reply(
                 *model_for_events.borrow_mut() = name.clone();
                 HistoryAction::SetModel(name)
             }
+            StreamEvent::ClearStatus => HistoryAction::ClearStatus,
         };
         history_for_events.dispatch(action);
     };

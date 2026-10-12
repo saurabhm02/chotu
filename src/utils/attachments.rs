@@ -12,7 +12,8 @@ pub fn attachments_to_send(cmd: Option<Commands>, attachments: &[String]) -> Vec
             | Commands::Bullets
             | Commands::Refine
             | Commands::Rewrite
-            | Commands::Extract,
+            | Commands::Extract
+            | Commands::Chat,
         ) => attachments.to_vec(),
         _ => Vec::new(),
     }
@@ -42,6 +43,7 @@ mod tests {
     #[test]
     fn every_text_command_gets_the_attachments() {
         for command in [
+            Commands::Chat,
             Commands::Explain,
             Commands::Translate,
             Commands::Tldr,

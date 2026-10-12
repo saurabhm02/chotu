@@ -8,4 +8,5 @@ pub mod ocr;
 pub mod opener;
 pub mod screen;
 pub mod tauri;
+pub mod web;
 pub mod window;
