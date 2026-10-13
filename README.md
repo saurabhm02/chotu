@@ -36,6 +36,7 @@ It is all Rust. The app is **Tauri v2** and the interface is **Yew** (Rust compi
 | `/extract` | Show all the text in a pasted image, or in a screenshot if you pasted none. No AI involved, so nothing gets changed | `/extract` |
 | `/chat` | Just answer, never search the web. Use it when an automatic search was not wanted | `/chat who is the prime minister of india` |
 | `/check` | Answer a yes/no question about highlighted text, with a percentage. It is a helper's guess, not a fact | `/check is this a scam?` |
+| `/decide` | Pick the best of 2 to 4 options, with a percentage for each. It is a helper's guess, not a fact | `/decide what should i eat pizza or burger?` |
 | `/ss` | Read the text on your screen, then answer your question | `/ss what is this error?` |
 | `/screen` | Show your screen to a vision model | `/screen what is this chart?` |
 | `/new` | Start a new chat | |
