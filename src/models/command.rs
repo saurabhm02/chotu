@@ -14,6 +14,7 @@ pub enum Commands {
     Extract,
     Check,
     Chat,
+    Decide,
 }
 
 impl Commands {
@@ -35,6 +36,7 @@ impl Commands {
             Commands::Extract => "extract",
             Commands::Check => "check",
             Commands::Chat => "chat",
+            Commands::Decide => "decide",
         }
     }
 }
@@ -118,6 +120,11 @@ pub fn all_commands() -> Vec<Command> {
             description: "Just answer, without searching the web",
             cmd: Commands::Chat,
         },
+        Command {
+            name: "decide",
+            description: "Pick the best of 2 to 4 options, with a percentage for each",
+            cmd: Commands::Decide,
+        },
     ]
 }
 
@@ -166,6 +173,13 @@ mod tests {
         let (cmd, rest) = detect_cmd("/chat who is the pm of india");
         assert_eq!(cmd, Some(Commands::Chat));
         assert_eq!(rest, "who is the pm of india");
+    }
+
+    #[test]
+    fn decide_is_found_with_its_options() {
+        let (cmd, rest) = detect_cmd("/decide what should i eat pizza or burger?");
+        assert_eq!(cmd, Some(Commands::Decide));
+        assert_eq!(rest, "what should i eat pizza or burger?");
     }
 
     #[test]
