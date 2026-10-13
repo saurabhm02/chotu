@@ -6,6 +6,7 @@ pub struct SerpItem {
     pub title: String,
     pub source: String,
     pub content: String,
+    pub needs_page: bool,
 }
 
 /// What the web command returns to the frontend: the answer plus (title, url) sources.

@@ -76,7 +76,6 @@ impl DecisionClient {
         None
     }
 
-
     /// Sends `body` to one model. `timeout` replaces the client's usual limit for this call.
     /// Any problem (offline, slow, an error status, an unreadable reply) gives `None`.
     async fn post_to_model(
@@ -85,7 +84,11 @@ impl DecisionClient {
         body: &Value,
         timeout: Option<Duration>,
     ) -> Option<Value> {
-        let mut request = self.client.post(&self.url).bearer_auth(&self.key).json(body);
+        let mut request = self
+            .client
+            .post(&self.url)
+            .bearer_auth(&self.key)
+            .json(body);
         if let Some(timeout) = timeout {
             request = request.timeout(timeout);
         }
@@ -267,11 +270,11 @@ fn parse_answers(reply: &Value, questions: &[DecisionQuestion]) -> Answers {
     answers
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::decision::Verdict;
+    use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
@@ -417,7 +420,9 @@ mod tests {
     async fn a_reply_we_cannot_use_counts_as_no_answer() {
         let url = fake_server(vec![(200, Some("not json".into()))]).await;
         assert_eq!(
-            decider_at(url, &["one"]).ask_yes_or_no("text", QUESTION).await,
+            decider_at(url, &["one"])
+                .ask_yes_or_no("text", QUESTION)
+                .await,
             None
         );
     }
@@ -450,5 +455,349 @@ mod tests {
         println!("secret: {secret:?}\nplain: {plain:?}");
         assert_eq!(secret.verdict, Verdict::Yes);
         assert_eq!(plain.verdict, Verdict::No);
+    }
+
+    struct Visit {
+        status: u16,
+        body: Option<String>,
+        delay: Duration,
+    }
+
+    fn answer_after(body: String, delay_ms: u64) -> Visit {
+        Visit {
+            status: 200,
+            body: Some(body),
+            delay: Duration::from_millis(delay_ms),
+        }
+    }
+
+    async fn read_request_body(socket: &mut tokio::net::TcpStream) -> Value {
+        let mut seen = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let count = socket.read(&mut chunk).await.unwrap();
+            if count == 0 {
+                return Value::Null;
+            }
+            seen.extend_from_slice(&chunk[..count]);
+            let text = String::from_utf8_lossy(&seen).to_string();
+            if let Some(head_end) = text.find("\r\n\r\n") {
+                let announced = text[..head_end]
+                    .lines()
+                    .find_map(|line| {
+                        line.to_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(str::to_string)
+                    })
+                    .and_then(|value| value.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                if seen.len() >= head_end + 4 + announced {
+                    return serde_json::from_str(&text[head_end + 4..]).unwrap_or(Value::Null);
+                }
+            }
+        }
+    }
+
+    async fn recording_server(visits: Vec<Visit>) -> (String, Arc<Mutex<Vec<Value>>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/decisions", listener.local_addr().unwrap());
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let record = received.clone();
+        tokio::spawn(async move {
+            for visit in visits {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let body = read_request_body(&mut socket).await;
+                record.lock().unwrap().push(body);
+                tokio::time::sleep(visit.delay).await;
+                match visit.body {
+                    Some(body) => {
+                        let answer = format!(
+                            "HTTP/1.1 {} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                            visit.status,
+                            body.len()
+                        );
+                        let _ = socket.write_all(answer.as_bytes()).await;
+                    }
+                    None => {
+                        tokio::spawn(async move {
+                            let _silent = socket;
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                        });
+                    }
+                }
+            }
+        });
+        (url, received)
+    }
+
+    fn kind_question() -> DecisionQuestion {
+        DecisionQuestion::choice(
+            "kind",
+            "What kind of content is this?",
+            &[
+                ("error", "an error message"),
+                ("code", "source code"),
+                ("other", "anything else"),
+            ],
+        )
+    }
+
+    fn quality_question() -> DecisionQuestion {
+        DecisionQuestion::score(
+            "quality",
+            "How clear is this?",
+            &["very unclear", "unclear", "clear", "very clear"],
+        )
+    }
+
+    fn file_question() -> DecisionQuestion {
+        DecisionQuestion::yes_no("has_file", "Does the text name a file?")
+    }
+
+    fn three_questions() -> Vec<DecisionQuestion> {
+        vec![kind_question(), quality_question(), file_question()]
+    }
+
+    fn real_shaped_reply() -> Value {
+        json!({
+            "model": "inception/mercury-decide-20260930",
+            "answers": {
+                "kind": {
+                    "type": "choice",
+                    "choice": "error",
+                    "probabilities": { "error": 0.9993, "code": 0.0002, "other": 0.0005 },
+                    "confidence": 0.999
+                },
+                "quality": {
+                    "type": "score",
+                    "score": 1.99,
+                    "legend": { "0": "very unclear", "1": "unclear", "2": "clear", "3": "very clear" },
+                    "probabilities": { "0": 0.009, "1": 0.069, "2": 0.843, "3": 0.078 },
+                    "confidence": 0.83
+                },
+                "has_file": { "type": "noul", "noul": 0.996 }
+            },
+            "usage": { "input_tokens": 101, "output_tokens": 3, "cost": 0 }
+        })
+    }
+
+    #[test]
+    fn the_questions_body_has_every_type_in_the_api_shape() {
+        let body = build_questions_body("some/model", "the text", &three_questions());
+        assert_eq!(body["model"], "some/model");
+        assert_eq!(body["state"], "the text");
+
+        let kind = &body["questions"]["kind"];
+        assert_eq!(kind["type"], "choice");
+        assert_eq!(kind["instructions"], "What kind of content is this?");
+        assert_eq!(kind["criteria"]["error"], "an error message");
+        assert_eq!(kind["criteria"]["other"], "anything else");
+
+        let quality = &body["questions"]["quality"];
+        assert_eq!(quality["type"], "score");
+        assert_eq!(quality["criteria"][0], "very unclear");
+        assert_eq!(quality["criteria"][3], "very clear");
+
+        let has_file = &body["questions"]["has_file"];
+        assert_eq!(has_file["type"], "noul");
+        assert!(has_file.get("criteria").is_none());
+    }
+
+    #[test]
+    fn a_real_shaped_reply_is_read_for_every_type() {
+        let answers = parse_answers(&real_shaped_reply(), &three_questions());
+        assert_eq!(answers.len(), 3);
+
+        let kind = answers.choice("kind").unwrap();
+        assert_eq!(kind.chosen, "error");
+        assert_eq!(kind.probabilities.len(), 3);
+        assert!((kind.probability_of("code").unwrap() - 0.0002).abs() < 1e-6);
+        assert!(kind.confidence > 0.99);
+
+        let quality = answers.score("quality").unwrap();
+        assert_eq!(quality.level, 2);
+        assert_eq!(quality.label, "clear");
+        assert!((quality.value - 1.99).abs() < 1e-6);
+        assert_eq!(quality.probabilities.len(), 4);
+
+        assert_eq!(answers.yes_no("has_file").unwrap().verdict, Verdict::Yes);
+    }
+
+    #[test]
+    fn an_answer_that_does_not_fit_the_question_is_left_out() {
+        let reply = json!({ "answers": {
+            "kind": { "type": "choice", "choice": "banana", "probabilities": {}, "confidence": 1.0 },
+            "quality": { "type": "score", "score": 7.0, "probabilities": {}, "confidence": 1.0 },
+            "has_file": { "type": "noul", "noul": 1.5 }
+        }});
+        let answers = parse_answers(&reply, &three_questions());
+        assert!(answers.is_empty());
+    }
+
+    #[test]
+    fn a_missing_chance_counts_as_zero_and_a_score_is_rounded_to_a_level() {
+        let reply = json!({ "answers": {
+            "kind": { "type": "choice", "choice": "code" },
+            "quality": { "type": "score", "score": 0.4 }
+        }});
+        let answers = parse_answers(&reply, &[kind_question(), quality_question()]);
+
+        let kind = answers.choice("kind").unwrap();
+        assert_eq!(kind.probability_of("code"), Some(0.0));
+        assert_eq!(kind.confidence, 0.0);
+
+        let quality = answers.score("quality").unwrap();
+        assert_eq!(quality.level, 0);
+        assert_eq!(quality.label, "very unclear");
+    }
+
+    #[tokio::test]
+    async fn several_questions_are_answered_in_one_call() {
+        let (url, received) =
+            recording_server(vec![answer_after(real_shaped_reply().to_string(), 0)]).await;
+        let answers = decider_at(url, &["inception/mercury-decide:free"])
+            .ask_questions("the text", &three_questions(), Duration::from_secs(2))
+            .await
+            .unwrap();
+
+        assert_eq!(answers.len(), 3);
+        let requests = received.lock().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["questions"].as_object().unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_yes_no_only_model_is_skipped_for_choice_and_score_questions() {
+        let (url, received) =
+            recording_server(vec![answer_after(real_shaped_reply().to_string(), 0)]).await;
+        let decider = decider_at(
+            url,
+            &["respan/span-01-lite:free", "inception/mercury-decide:free"],
+        );
+        let answers = decider
+            .ask_questions("the text", &three_questions(), Duration::from_secs(2))
+            .await;
+
+        assert!(answers.is_some());
+        let requests = received.lock().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["model"], "inception/mercury-decide:free");
+    }
+
+    #[tokio::test]
+    async fn yes_no_questions_still_try_the_yes_no_model_first() {
+        let reply = json!({ "answers": { "has_file": { "type": "noul", "noul": 0.1 } } });
+        let (url, received) = recording_server(vec![answer_after(reply.to_string(), 0)]).await;
+        let decider = decider_at(
+            url,
+            &["respan/span-01-lite:free", "inception/mercury-decide:free"],
+        );
+        let answers = decider
+            .ask_questions("the text", &[file_question()], Duration::from_secs(2))
+            .await
+            .unwrap();
+
+        assert_eq!(answers.yes_no("has_file").unwrap().verdict, Verdict::No);
+        assert_eq!(
+            received.lock().unwrap()[0]["model"],
+            "respan/span-01-lite:free"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_model_that_misses_a_question_is_followed_by_the_next_one() {
+        let partial = json!({ "answers": { "has_file": { "type": "noul", "noul": 0.9 } } });
+        let (url, received) = recording_server(vec![
+            answer_after(partial.to_string(), 0),
+            answer_after(real_shaped_reply().to_string(), 0),
+        ])
+        .await;
+        let answers = decider_at(url, &["first", "second"])
+            .ask_questions("the text", &three_questions(), Duration::from_secs(2))
+            .await
+            .unwrap();
+
+        assert_eq!(answers.len(), 3);
+        assert_eq!(received.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn when_no_model_answers_everything_the_fullest_reply_is_kept() {
+        let one = json!({ "answers": { "has_file": { "type": "noul", "noul": 0.9 } } });
+        let two = json!({ "answers": {
+            "has_file": { "type": "noul", "noul": 0.9 },
+            "kind": { "type": "choice", "choice": "code", "probabilities": {}, "confidence": 0.5 }
+        }});
+        let (url, _) = recording_server(vec![
+            answer_after(one.to_string(), 0),
+            answer_after(two.to_string(), 0),
+        ])
+        .await;
+        let answers = decider_at(url, &["first", "second"])
+            .ask_questions("the text", &three_questions(), Duration::from_secs(2))
+            .await
+            .unwrap();
+
+        assert_eq!(answers.len(), 2);
+        assert!(answers.choice("kind").is_some());
+    }
+
+    #[tokio::test]
+    async fn the_call_gets_its_own_time_limit() {
+        let reply = real_shaped_reply().to_string();
+
+        let (slow_url, _) = recording_server(vec![answer_after(reply, 600)]).await;
+        let patient = decider_at(slow_url, &["one"])
+            .ask_questions("text", &three_questions(), Duration::from_secs(3))
+            .await;
+        assert!(
+            patient.is_some(),
+            "a longer limit for the call should be used"
+        );
+
+        let (silent_url, _) = recording_server(vec![Visit {
+            status: 200,
+            body: None,
+            delay: Duration::ZERO,
+        }])
+        .await;
+        let started = Instant::now();
+        let impatient = decider_at(silent_url, &["one"])
+            .ask_questions("text", &three_questions(), Duration::from_millis(150))
+            .await;
+        assert!(impatient.is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn no_questions_or_repeated_ids_ask_nothing() {
+        let (url, received) = recording_server(vec![]).await;
+        let decider = decider_at(url, &["one"]);
+        let timeout = Duration::from_secs(1);
+
+        assert_eq!(decider.ask_questions("text", &[], timeout).await, None);
+        let repeated = [file_question(), file_question()];
+        assert_eq!(
+            decider.ask_questions("text", &repeated, timeout).await,
+            None
+        );
+        assert!(received.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn several_real_questions_in_one_call() {
+        dotenvy::dotenv().ok();
+        let decider = DecisionClient::shared();
+        let text = "TypeError: cannot read properties of undefined (reading 'map') at App.js:42";
+        let answers = decider
+            .ask_questions(text, &three_questions(), Duration::from_secs(10))
+            .await
+            .expect("no decision model answered");
+
+        println!("{answers:#?}");
+        assert_eq!(answers.choice("kind").unwrap().chosen, "error");
+        assert!(answers.score("quality").is_some());
+        assert_eq!(answers.yes_no("has_file").unwrap().verdict, Verdict::Yes);
     }
 }

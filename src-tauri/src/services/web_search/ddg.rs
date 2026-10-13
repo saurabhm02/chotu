@@ -66,8 +66,6 @@ pub async fn search_ddg(
     Ok(parse_html(&body))
 }
 
-
-
 pub fn parse_html(body: &str) -> Vec<SerpItem> {
     let row_selector = Selector::parse("div.result").expect("Valid Selector");
     let title_selector = Selector::parse("a.result__a").expect("Valid Selector");
@@ -106,6 +104,7 @@ pub fn parse_html(body: &str) -> Vec<SerpItem> {
             title,
             source: url,
             content: desc,
+            needs_page: true,
         });
     }
 
@@ -158,8 +157,7 @@ fn percent_decode(s: &str) -> String {
 /// ddg marks sponsored rows with a `result--ad` class, or points them at the
 /// `y.js` ad-redirect endpoint instead of `l/`.
 fn is_ad(class_attr: Option<&str>, source: &str) -> bool {
-    class_attr.is_some_and(|c| c.contains("result--ad"))
-        || source.contains("duckduckgo.com/y.js")
+    class_attr.is_some_and(|c| c.contains("result--ad")) || source.contains("duckduckgo.com/y.js")
 }
 
 #[cfg(test)]

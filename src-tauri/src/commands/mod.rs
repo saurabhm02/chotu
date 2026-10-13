@@ -1,5 +1,6 @@
 pub mod chat;
 pub mod check;
+pub mod decide;
 pub mod history;
 pub mod images;
 pub mod ocr;

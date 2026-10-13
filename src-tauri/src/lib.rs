@@ -47,6 +47,7 @@ pub fn run() {
             commands::images::view_image,
             commands::chat::ask_command,
             commands::check::check_text,
+            commands::decide::decide_between,
             commands::web::should_search_web,
         ])
         .run(tauri::generate_context!())

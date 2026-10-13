@@ -58,11 +58,11 @@ pub fn format_response(decision: Option<Decision>) -> String {
 }
 
 /// 0.97 becomes "97%".
-fn format_percent(probability: f32) -> String {
+pub fn format_percent(probability: f32) -> String {
     format!("{}%", (probability * 100.0).round() as u32)
 }
 
-fn render_bar(fraction: f32) -> String {
+pub fn render_bar(fraction: f32) -> String {
     let filled = ((fraction * BAR_WIDTH as f32).round() as usize).min(BAR_WIDTH);
     format!("{}{}", "█".repeat(filled), "░".repeat(BAR_WIDTH - filled))
 }

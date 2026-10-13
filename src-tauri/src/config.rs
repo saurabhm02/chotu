@@ -76,8 +76,30 @@ pub const AUTO_WEB_TIMEOUT_S: u64 = 3;
 
 pub const AUTO_WEB_QUESTION: &str = "Does answering this question correctly need fresh information from the internet, such as today's news, current prices, live scores, the weather, recent events, or the latest version of something?";
 
-/// The longest a call with several or harder questions (a scorecard) may take.
 pub const DECISION_SLOW_TIMEOUT_S: u64 = 10;
-
-/// Decision models that only answer yes/no. Choice and score questions skip them.
 pub const NOUL_ONLY_DECISION_MODELS: [&str; 1] = ["respan/span-01-lite:free"];
+
+pub const DECIDE_MAX_OPTIONS: usize = 4;
+pub const DECIDE_HINT_MESSAGE: &str = "I could not find your options. Give me 2 to 4, for example: /decide what should i eat, pizza or burger";
+pub const DECIDE_QUESTION: &str =
+    "The text asks which option to pick. Which option is the best choice for the person asking?";
+pub const SURE_CHOICE_THRESHOLD: f32 = 0.6;
+
+pub const DECIDE_OPTIONS_TIMEOUT_S: u64 = 20;
+pub const DECIDE_OPTIONS_PROMPT: &str =
+    "Find the options the user is choosing between in the text. \
+Rules: reply with the options only, one per line, with no numbers, no bullets and no other words. \
+Copy each option exactly as the user wrote it. \
+Never add, invent or suggest an option the user did not write. \
+A comparison such as \"A or B\" or \"is A better than B\" names the options A and B. \
+If the text does not name at least 2 options to choose between, reply with exactly: NONE";
+
+pub const BACKUP_TIMEOUT_S: u64 = 5;
+pub const BACKUP_USER_AGENT: &str = "Chotu/0.1";
+pub const WIKIPEDIA_RESULTS: usize = 3;
+pub const WIKIPEDIA_EXTRACT_CHARS: usize = 700;
+pub const NEWS_RESULTS: usize = 5;
+/// Country for Google News when `NEWS_REGION` is not set in `.env`. Two letters, for example "IN" or "US".
+pub const DEFAULT_NEWS_REGION: &str = "IN";
+pub const WEATHER_DAYS: usize = 3;
+pub const WEATHER_PLACE_TRIES: usize = 4;

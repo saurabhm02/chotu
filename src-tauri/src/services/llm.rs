@@ -18,12 +18,14 @@ use tauri::ipc::Channel;
 
 use crate::{
     config::{
-        ALL_MODELS_FAILED_MESSAGE, DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS, MODEL_TIMEOUT_S,
-        TITLE_PROMPT, TITLE_TIMEOUT_S, WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE,
-        WRONG_API_KEY_MESSAGE,
+        ALL_MODELS_FAILED_MESSAGE, DECIDE_OPTIONS_PROMPT, DECIDE_OPTIONS_TIMEOUT_S,
+        DEFAULT_SYSTEM_PROMPT, DEFAULT_VISION_MODELS, MODEL_TIMEOUT_S, TITLE_PROMPT,
+        TITLE_TIMEOUT_S, WEB_EMPTY_PROMPT_TEMPLATE, WEB_PROMPT_TEMPLATE, WRONG_API_KEY_MESSAGE,
     },
-    models::chat::ChatMessage,
-    models::stream::{Phase, StreamEvent},
+    models::{
+        chat::ChatMessage,
+        stream::{Phase, StreamEvent},
+    },
     services::{failover, prompt},
     utils::images,
 };
@@ -282,16 +284,34 @@ impl AiClient {
 
     pub async fn generate_title(&self, question: &str, answer: &str) -> Result<String, String> {
         let conversation = format!("Question:\n{question}\n\nAnswer:\n{answer}");
+        let timeout = Duration::from_secs(TITLE_TIMEOUT_S);
+        self.call_llm_for_small_tasks(TITLE_PROMPT, &conversation, timeout, "title")
+            .await
+    }
 
+    /// The options in `typed`, one per line, or "NONE". The caller checks the lines.
+    pub async fn list_options(&self, typed: &str) -> Result<String, String> {
+        let timeout = Duration::from_secs(DECIDE_OPTIONS_TIMEOUT_S);
+        self.call_llm_for_small_tasks(DECIDE_OPTIONS_PROMPT, typed, timeout, "options list")
+            .await
+    }
+
+    async fn call_llm_for_small_tasks(
+        &self,
+        instructions: &str,
+        text: &str,
+        timeout: Duration,
+        purpose: &str,
+    ) -> Result<String, String> {
         for model in self.text_models.iter().take(2) {
             let messages: Vec<ChatCompletionRequestMessage> = vec![
                 ChatCompletionRequestSystemMessageArgs::default()
-                    .content(TITLE_PROMPT)
+                    .content(instructions)
                     .build()
                     .map_err(|e| e.to_string())?
                     .into(),
                 ChatCompletionRequestUserMessageArgs::default()
-                    .content(conversation.clone())
+                    .content(text)
                     .build()
                     .map_err(|e| e.to_string())?
                     .into(),
@@ -302,26 +322,28 @@ impl AiClient {
                 .build()
                 .map_err(|e| e.to_string())?;
 
-            let timeout = Duration::from_secs(TITLE_TIMEOUT_S);
             match tokio::time::timeout(timeout, self.client.chat().create(request)).await {
                 Ok(Ok(response)) => {
-                    let title = response
+                    let answer = response
                         .choices
                         .first()
                         .and_then(|choice| choice.message.content.as_deref())
                         .map(str::trim)
-                        .filter(|title| !title.is_empty());
-                    if let Some(title) = title {
-                        return Ok(title.to_string());
+                        .filter(|answer| !answer.is_empty());
+                    if let Some(answer) = answer {
+                        return Ok(answer.to_string());
                     }
-                    log::warn!("{model} returned an empty title");
+                    log::warn!("{model} returned an empty {purpose}");
                 }
-                Ok(Err(e)) => log::warn!("title request to {model} failed: {e}"),
-                Err(_) => log::warn!("title request to {model} timed out after {TITLE_TIMEOUT_S}s"),
+                Ok(Err(e)) => log::warn!("{purpose} request to {model} failed: {e}"),
+                Err(_) => log::warn!(
+                    "{purpose} request to {model} timed out after {}s",
+                    timeout.as_secs()
+                ),
             }
         }
 
-        Err("no title generated".to_string())
+        Err(format!("no {purpose} generated"))
     }
 
     pub async fn call_llm_for_web(
