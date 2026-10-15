@@ -11,6 +11,7 @@ pub mod screen;
 pub mod selection;
 #[cfg(desktop)]
 pub mod shortcut;
+pub mod tools;
 pub mod tray;
 pub mod web;
 pub mod web_search;
