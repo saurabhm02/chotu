@@ -103,3 +103,10 @@ pub const NEWS_RESULTS: usize = 5;
 pub const DEFAULT_NEWS_REGION: &str = "IN";
 pub const WEATHER_DAYS: usize = 3;
 pub const WEATHER_PLACE_TRIES: usize = 4;
+
+pub const DEFAULT_AGENT_MODELS: [&str; 4] = [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "thinkingmachines/inkling-small:free",
+    "cohere/north-mini-code:free",
+    "openrouter/free",
+];

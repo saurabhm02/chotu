@@ -71,7 +71,7 @@ impl ToolRegistry {
             .find(name)
             .ok_or(format!("There is no tool named `{name}`."))?;
         let arguments = parse_arguments(&tool.parameters, raw_arguments)?;
-        let result = tokio::time::timeout(tool.time_limit, (tool.function)(arguments))
+        let result = tokio:: time::timeout(tool.time_limit, (tool.function)(arguments))
             .await
             .map_err(|_| format!("The tool `{name}` took too long and was stopped."))?;
         result.map(|text| cap_result(&text, tool.max_result_chars))
